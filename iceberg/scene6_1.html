@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene 6 — CVD vs Цена</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #050608; display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; font-family: 'Inter', sans-serif;
+}
+.frame {
+  width: 540px; height: 960px; position: relative; overflow: hidden;
+  background: #08090f; border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px; box-shadow: 0 0 80px rgba(0,0,0,0.9);
+}
+canvas { position: absolute; top: 0; left: 0; width: 540px; height: 960px; z-index: 1; }
+
+/* Header */
+.hdr {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  padding: 22px 28px 18px; display: flex; justify-content: space-between; align-items: flex-start;
+  background: linear-gradient(180deg, rgba(8,9,15,0.97) 60%, transparent 100%);
+}
+.hdr-pair { font-size: 24px; font-weight: 800; color: #eef0f8; letter-spacing: 0.3px; }
+.hdr-pair em { color: rgba(238,240,248,0.28); font-style: normal; font-weight: 500; }
+.hdr-sub { font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.8px; text-transform: uppercase; margin-top: 5px; }
+.hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.ice-tag {
+  padding: 4px 11px; border-radius: 7px;
+  background: rgba(245,200,66,0.1); border: 1px solid rgba(245,200,66,0.28);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #f5c842;
+  text-shadow: 0 0 8px rgba(245,200,66,0.7);
+  animation: icePulse 1.4s ease-in-out infinite;
+}
+@keyframes icePulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+.live-badge { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.5px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 8px rgba(46,204,113,0.9); animation: ldBlink 2s ease-in-out infinite; }
+@keyframes ldBlink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* Readout */
+.readout {
+  position: absolute; top: 108px; left: 0; right: 0; z-index: 3;
+  height: 60px; display: flex; align-items: stretch;
+  background: rgba(8,9,15,0.94);
+  border-top: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(245,200,66,0.08);
+}
+.rd-blk { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 16px; gap: 2px; }
+.rd-blk.ctr { align-items: center; border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); }
+.rd-blk.right { align-items: flex-end; }
+.rd-lbl { font-size: 9px; font-weight: 700; color: #1a2235; letter-spacing: 1.8px; text-transform: uppercase; }
+.rd-val { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+.rd-val.g { color: #32dc82; text-shadow: 0 0 12px rgba(50,220,130,0.35); }
+.rd-val.dim { color: rgba(238,240,248,0.22); }
+.rd-sub { font-size: 10px; font-weight: 500; color: #1a2235; }
+.rd-mid-icon { font-size: 20px; line-height: 1; opacity: 0.6; }
+
+/* Stats */
+.stats {
+  position: absolute; bottom: 92px; left: 0; right: 0; z-index: 3;
+  display: flex; padding: 0 16px; gap: 8px;
+}
+.s-box {
+  flex: 1; background: rgba(8,9,15,0.88); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.055); border-radius: 14px;
+  padding: 14px 12px 12px; display: flex; flex-direction: column; gap: 3px;
+}
+.s-box.accent { border-color: rgba(245,200,66,0.2); }
+.s-lbl { font-size: 9px; font-weight: 700; color: #1a2235; letter-spacing: 1.8px; text-transform: uppercase; }
+.s-val { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+.s-val.y { color: #f5c842; text-shadow: 0 0 12px rgba(245,200,66,0.35); }
+.s-val.g { color: #32dc82; text-shadow: 0 0 10px rgba(50,220,130,0.3); }
+.s-val.w { color: #eef0f8; }
+.s-sub { font-size: 10px; font-weight: 500; color: #1a2235; }
+
+/* Footer */
+.footer {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  height: 90px; padding: 16px 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(0deg, rgba(8,9,15,0.98) 65%, transparent 100%);
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.f-lbl { font-size: 10px; font-weight: 700; color: #1a2235; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+.f-price { font-size: 28px; font-weight: 800; color: #eef0f8; letter-spacing: -0.5px; }
+.frozen-tag {
+  padding: 4px 12px; border-radius: 7px;
+  background: rgba(50,220,130,0.08); border: 1px solid rgba(50,220,130,0.2);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #32dc82;
+  animation: ldBlink 2.2s ease-in-out infinite;
+}
+.f-delta { font-size: 12px; font-weight: 600; color: #172a22; margin-top: 5px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <div class="hdr">
+    <div>
+      <div class="hdr-pair">BTC<em>/USDT</em></div>
+      <div class="hdr-sub">Дивергенция CVD vs цена</div>
+    </div>
+    <div class="hdr-right">
+      <div class="ice-tag">⬡ ICE</div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>
+  </div>
+
+  <div class="readout">
+    <div class="rd-blk">
+      <span class="rd-lbl">CVD Δ</span>
+      <span class="rd-val g" id="rdCvd">+0</span>
+      <span class="rd-sub">BTC накоплено</span>
+    </div>
+    <div class="rd-blk ctr">
+      <span class="rd-lbl">Дивергенция</span>
+      <span class="rd-mid-icon" id="rdMid">↓↓</span>
+    </div>
+    <div class="rd-blk right">
+      <span class="rd-lbl">Цена Δ</span>
+      <span class="rd-val dim" id="rdPDelta">$0.00</span>
+      <span class="rd-sub" id="rdPSub">движение цены</span>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="s-box accent">
+      <div class="s-lbl">Импульсов</div>
+      <div class="s-val y" id="sDet">0</div>
+      <div class="s-sub">детектировано</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">Прирост</div>
+      <div class="s-val g" id="sImp">+$0</div>
+      <div class="s-sub">суммарно</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">CVD пик</div>
+      <div class="s-val w" id="sCvdMax">+0</div>
+      <div class="s-sub">максимальный</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <div class="f-lbl">Last Price</div>
+      <div class="f-price" id="fPrice">65,230.00</div>
+    </div>
+    <div style="text-align:right">
+      <div class="frozen-tag" id="fTag">FROZEN</div>
+      <div class="f-delta" id="fDelta">Δ 0.00 USD (0.000%)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 540, H = 960, CX = 270;
+
+// Chart layout
+const CHART_X = 46, CHART_W = 450;
+const CVD_T   = 185, CVD_H  = 208, CVD_B = CVD_T + CVD_H;  // 185→393
+const DIV_T   = 393, DIV_B  = 447, DIV_MID = 420;           // 54px zone
+const PRC_T   = 447, PRC_H  = 210, PRC_B = PRC_T + PRC_H;  // 447→657
+const ANN_Y   = 675;   // annotation line below price chart
+
+const N_PTS    = CHART_W;
+const CVD_MAX  = 920;
+const P_BASE   = 65230;
+const P_MIN    = 65110, P_MAX = 65430;
+const IMPULSE  = 142;
+
+function cvdY(v) { return CVD_B - Math.max(0, Math.min(1, v / CVD_MAX)) * CVD_H; }
+function prcY(v) { return PRC_B - Math.max(0, Math.min(1, (v - P_MIN) / (P_MAX - P_MIN))) * PRC_H; }
+
+const CYCLE   = 570;
+const EXP_T   = 0.763;
+const EXP_F   = Math.round(CYCLE * EXP_T);  // 435
+
+// History arrays
+let cvdHist = new Array(N_PTS).fill(0);
+let prcHist = new Array(N_PTS).fill(P_BASE);
+
+// State
+let frameN      = 0;
+let divMag      = 0;
+let lastExpCyc  = -1;
+let screenFlash = 0, shakeAmt = 0;
+let bannerLife  = 0, bannerImpulse = 0;
+let detCount    = 0, totalImpulse = 0, cvdPeak = 0;
+let explodedAt  = -9999;
+
+// Effects
+let parts = [], sparks = [], rings = [], lightnings = [], flashes = [], floatNums = [], flowParts = [];
+
+// BG ambient
+let bgDots = [];
+function rnd(a, b) { return a + Math.random() * (b - a); }
+for (let i = 0; i < 44; i++) {
+  bgDots.push({
+    x: rnd(0, W), y: rnd(0, H),
+    vx: rnd(-0.06, 0.06), vy: rnd(-0.05, 0.05),
+    r: rnd(0.4, 1.5), a: rnd(0.02, 0.08),
+    col: Math.random() > 0.5 ? '#f5c842' : '#32dc82'
+  });
+}
+
+// ── Data generators ──
+function genCVD(f) {
+  const cf = f % CYCLE, t = cf / CYCLE;
+  const n  = Math.sin(f * 0.18) * 20 + Math.sin(f * 0.075) * 12;
+  if (t < EXP_T) return Math.max(0, (t / EXP_T) * 847 + n);
+  if (t < EXP_T + 0.04) return 847 + n * 0.08;
+  const decay = Math.min(1, (t - EXP_T - 0.04) / 0.16);
+  return Math.max(0, 847 * (1 - decay) + n * (1 - decay));
+}
+
+function genPrc(f) {
+  const cf = f % CYCLE, t = cf / CYCLE;
+  const n  = Math.sin(f * 0.09) * 0.45;
+  if (t < EXP_T) return P_BASE + n;
+  const pt = Math.min(1, (t - EXP_T) / 0.14);
+  const ep = pt < 0.5 ? 2 * pt * pt : -1 + (4 - 2 * pt) * pt;
+  const settle = t > EXP_T + 0.14 ? Math.min(1, (t - EXP_T - 0.14) / 0.1) : 0;
+  return P_BASE + ep * IMPULSE - settle * 38 + n * (1 - pt * 0.7);
+}
+
+// ── Lightning ──
+function drawLightning(x1, y1, x2, y2, col, alpha, w) {
+  const pts = [{x: x1, y: y1}];
+  for (let i = 1; i < 7; i++) {
+    const t = i / 7;
+    pts.push({x: x1+(x2-x1)*t+rnd(-16,16), y: y1+(y2-y1)*t+rnd(-13,13)});
+  }
+  pts.push({x: x2, y: y2});
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, alpha);
+  ctx.strokeStyle = col; ctx.lineWidth = w;
+  ctx.shadowColor = col; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = w * 0.28; ctx.shadowBlur = 4;
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── Explosion ──
+function triggerExplosion(cvdAtExp) {
+  detCount++; totalImpulse += IMPULSE;
+  if (cvdAtExp > cvdPeak) cvdPeak = cvdAtExp;
+  screenFlash = 1.5; shakeAmt = 16; bannerLife = 0.01;
+  bannerImpulse = IMPULSE;
+  explodedAt = frameN;
+
+  // Flashes
+  flashes.push({x: CX, y: DIV_MID, life: 1, big: true});
+  flashes.push({x: CX, y: PRC_T + 36, life: 0.9, big: false});
+
+  // Burst from div zone
+  for (let i = 0; i < 58; i++) {
+    const a = rnd(0, Math.PI*2), s = rnd(2, 14);
+    parts.push({
+      x: CHART_X + rnd(20, CHART_W-20), y: DIV_MID,
+      vx: Math.cos(a)*s, vy: Math.sin(a)*s,
+      r: rnd(2, 7), life: 1,
+      col: Math.random() > 0.38 ? '#f5c842' : (Math.random() > 0.5 ? '#32dc82' : '#ff9030')
+    });
+  }
+
+  // Sparks
+  for (let i = 0; i < 30; i++) {
+    const a = rnd(0, Math.PI*2), s = rnd(6, 24);
+    sparks.push({
+      x: CHART_X + rnd(20, CHART_W-20), y: DIV_MID,
+      vx: Math.cos(a)*s, vy: Math.sin(a)*s,
+      life: 1, len: rnd(10, 36), col: i%2 === 0 ? '#f5c842' : '#32dc82'
+    });
+  }
+
+  // Debris
+  for (let i = 0; i < 14; i++) {
+    const a = rnd(0, Math.PI*2);
+    parts.push({
+      x: CHART_X + rnd(30, CHART_W-30), y: DIV_MID,
+      vx: Math.cos(a)*rnd(2,9), vy: Math.sin(a)*rnd(2,8),
+      r: rnd(3, 8), life: 1, col: '#f5c842',
+      square: true, rot: rnd(0, Math.PI), rotV: rnd(-0.26, 0.26)
+    });
+  }
+
+  // Rings
+  rings.push({x: CX, y: DIV_MID, r: 4, maxR: 330, life: 1, col: '#f5c842', thick: true});
+  for (let i = 1; i <= 5; i++) {
+    setTimeout(() => {
+      rings.push({x: CX, y: DIV_MID, r: i*8, maxR: 160+i*60, life: 1, col: i%2===0 ? '#32dc82' : '#ffffff', thick: false});
+    }, i * 78);
+  }
+
+  // Lightnings — vertical through div zone (price impulse)
+  for (let i = 0; i < 6; i++) {
+    const lx = CHART_X + rnd(10, CHART_W-10);
+    lightnings.push({x1: lx, y1: CVD_B - rnd(0,24), x2: lx+rnd(-22,22), y2: PRC_T+rnd(0,28), life: 1.1, col: '#f5c842', thick: i < 2});
+  }
+  // Horizontal across price chart (price jump line)
+  for (let i = 0; i < 4; i++) {
+    lightnings.push({
+      x1: CHART_X, y1: prcY(P_BASE) + rnd(-4, 8),
+      x2: CHART_X + CHART_W, y2: prcY(P_BASE + IMPULSE) + rnd(-8, 12),
+      life: 1.0, col: '#32dc82', thick: i === 0
+    });
+  }
+
+  // Float numbers
+  floatNums.push({x: CX, y: DIV_MID - 14, text: 'ИМПУЛЬС!', life: 1, vy: -1.3, big: true, col: '#f5c842'});
+  setTimeout(() => {
+    floatNums.push({x: CX, y: PRC_T + 88, text: '+$' + IMPULSE + '.00', life: 1.2, vy: -0.95, big: false, col: '#32dc82'});
+  }, 240);
+
+  updateDom();
+}
+
+function updateDom() {
+  document.getElementById('sDet').textContent  = detCount;
+  document.getElementById('sImp').textContent  = '+$' + (detCount * IMPULSE);
+  document.getElementById('sCvdMax').textContent = '+' + Math.round(cvdPeak);
+}
+
+// ── UPDATE ──
+function update() {
+  frameN++;
+  const cf  = frameN % CYCLE;
+  const ci  = Math.floor(frameN / CYCLE);
+  const t   = cf / CYCLE;
+  const curCVD = genCVD(frameN);
+  const curPrc = genPrc(frameN);
+
+  cvdHist.push(curCVD); cvdHist.shift();
+  prcHist.push(curPrc); prcHist.shift();
+
+  divMag = Math.max(0, Math.min(1, curCVD / 847));
+
+  // Trigger
+  if (cf >= EXP_F && lastExpCyc !== ci) {
+    lastExpCyc = ci;
+    triggerExplosion(curCVD);
+  }
+
+  // Banner lifecycle
+  const inExplosion = ci === lastExpCyc && t >= EXP_T;
+  if (bannerLife > 0 && bannerLife < 1) bannerLife = Math.min(1, bannerLife + 0.065);
+  if (bannerLife >= 1 && t > 0.9) bannerLife = Math.max(0, bannerLife - 0.06);
+
+  // Decay
+  if (shakeAmt > 0) { shakeAmt *= 0.73; if (shakeAmt < 0.25) shakeAmt = 0; }
+  if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - 0.046);
+
+  // Flow particles (pressing through div zone)
+  if (divMag > 0.12 && Math.random() < divMag * 0.32) {
+    flowParts.push({
+      x: CHART_X + rnd(10, CHART_W - 10),
+      y: DIV_T + rnd(0, 14),
+      vy: rnd(0.9, 2.8) * (0.4 + divMag * 0.9),
+      r: rnd(1, 3.2), life: 1
+    });
+  }
+
+  for (let i = parts.length-1; i >= 0; i--) {
+    const p = parts[i];
+    if (p.square) p.rot = (p.rot||0) + (p.rotV||0);
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.93; p.vy *= 0.93;
+    p.life -= 0.027;
+    if (p.life <= 0) parts.splice(i, 1);
+  }
+  for (let i = sparks.length-1; i >= 0; i--) {
+    const s = sparks[i];
+    s.x += s.vx; s.y += s.vy;
+    s.vx *= 0.90; s.vy *= 0.90;
+    s.life -= 0.040;
+    if (s.life <= 0) sparks.splice(i, 1);
+  }
+  for (let i = rings.length-1; i >= 0; i--) {
+    const rg = rings[i];
+    rg.r += (rg.maxR - rg.r) * 0.088;
+    rg.life -= 0.027;
+    if (rg.life <= 0) rings.splice(i, 1);
+  }
+  for (let i = flashes.length-1; i >= 0; i--) {
+    flashes[i].life -= 0.065;
+    if (flashes[i].life <= 0) flashes.splice(i, 1);
+  }
+  for (let i = lightnings.length-1; i >= 0; i--) {
+    lightnings[i].life -= 0.145;
+    if (lightnings[i].life <= 0) lightnings.splice(i, 1);
+  }
+  for (let i = floatNums.length-1; i >= 0; i--) {
+    const fn = floatNums[i];
+    fn.y += fn.vy; fn.vy *= 0.97;
+    fn.life -= 0.020;
+    if (fn.life <= 0) floatNums.splice(i, 1);
+  }
+  for (let i = flowParts.length-1; i >= 0; i--) {
+    const fp = flowParts[i];
+    fp.y += fp.vy; fp.life -= 0.042;
+    if (fp.y > DIV_B + 4 || fp.life <= 0) flowParts.splice(i, 1);
+  }
+  for (const d of bgDots) {
+    d.x += d.vx; d.y += d.vy;
+    if (d.x < 0) d.x = W; if (d.x > W) d.x = 0;
+    if (d.y < 0) d.y = H; if (d.y > H) d.y = 0;
+  }
+
+  // DOM readout
+  document.getElementById('rdCvd').textContent = '+' + Math.round(curCVD);
+  const pDelta = curPrc - P_BASE;
+  const rdPEl  = document.getElementById('rdPDelta');
+  const rdPSub = document.getElementById('rdPSub');
+  if (pDelta > 0.8) {
+    rdPEl.textContent = '+$' + pDelta.toFixed(0);
+    rdPEl.className   = 'rd-val g';
+    rdPSub.textContent = '↑ импульс вверх';
+  } else {
+    rdPEl.textContent = '$0.00';
+    rdPEl.className   = 'rd-val dim';
+    rdPSub.textContent = 'движение цены';
+  }
+
+  // Footer price
+  const priceNow = Math.round(curPrc * 100) / 100;
+  document.getElementById('fPrice').textContent = priceNow.toLocaleString('en-US', {minimumFractionDigits: 2});
+  const delta = priceNow - P_BASE;
+  if (Math.abs(delta) > 0.8) {
+    const pct = (delta / P_BASE * 100).toFixed(3);
+    document.getElementById('fDelta').textContent = 'Δ +' + delta.toFixed(2) + ' USD (+' + pct + '%)';
+    document.getElementById('fDelta').style.color = '#1a4030';
+    document.getElementById('fTag').textContent = 'IMPULSE';
+    document.getElementById('fTag').style.color  = '#f5c842';
+    document.getElementById('fTag').style.borderColor = 'rgba(245,200,66,0.3)';
+    document.getElementById('fTag').style.background  = 'rgba(245,200,66,0.08)';
+  } else {
+    document.getElementById('fDelta').textContent = 'Δ 0.00 USD (0.000%)';
+    document.getElementById('fDelta').style.color = '#172a22';
+    document.getElementById('fTag').textContent  = 'FROZEN';
+    document.getElementById('fTag').style.color  = '#32dc82';
+    document.getElementById('fTag').style.borderColor = 'rgba(50,220,130,0.2)';
+    document.getElementById('fTag').style.background  = 'rgba(50,220,130,0.08)';
+  }
+}
+
+// ══════════════════════════
+//  DRAW: CVD Chart
+// ══════════════════════════
+function drawCvdChart() {
+  ctx.fillStyle = 'rgba(3,7,18,0.97)';
+  ctx.fillRect(CHART_X, CVD_T, CHART_W, CVD_H);
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(CHART_X, CVD_T, CHART_W, CVD_H); ctx.clip();
+
+  // Grid
+  for (let v = 0; v <= CVD_MAX; v += 200) {
+    const y = cvdY(v);
+    if (y < CVD_T - 1 || y > CVD_B + 1) continue;
+    ctx.beginPath(); ctx.moveTo(CHART_X, y); ctx.lineTo(CHART_X + CHART_W, y);
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 0.8; ctx.stroke();
+  }
+  // Scanlines
+  ctx.fillStyle = 'rgba(0,0,0,0.055)';
+  for (let sy = CVD_T; sy < CVD_B; sy += 4) ctx.fillRect(CHART_X, sy, CHART_W, 1.5);
+
+  // CVD fill
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) {
+    const x = CHART_X + i, y = cvdY(cvdHist[i]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.lineTo(CHART_X + N_PTS - 1, CVD_B); ctx.lineTo(CHART_X, CVD_B); ctx.closePath();
+  const cf = ctx.createLinearGradient(0, CVD_T, 0, CVD_B);
+  cf.addColorStop(0, 'rgba(50,220,130,0.22)'); cf.addColorStop(1, 'rgba(50,220,130,0.02)');
+  ctx.fillStyle = cf; ctx.fill();
+
+  // CVD line
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) {
+    const x = CHART_X + i, y = cvdY(cvdHist[i]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = '#32dc82'; ctx.lineWidth = 2.3;
+  ctx.shadowColor = '#32dc82'; ctx.shadowBlur = 10 + divMag * 16;
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  ctx.restore();
+
+  // Border
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  ctx.strokeRect(CHART_X, CVD_T, CHART_W, CVD_H);
+
+  // Y labels
+  ctx.save();
+  ctx.font = '600 9px Inter'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let v = 0; v <= 800; v += 200) {
+    const y = cvdY(v);
+    if (y < CVD_T + 3 || y > CVD_B - 3) continue;
+    ctx.fillStyle = 'rgba(50,220,130,0.22)';
+    ctx.fillText(v, CHART_X - 6, y);
+  }
+  ctx.restore();
+
+  // Title
+  ctx.font = '700 10px Inter'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(50,220,130,0.38)';
+  ctx.fillText('CVD Δ  (кумулятивный объём, BTC)', CHART_X + 8, CVD_T + 6);
+
+  // Live dot + value
+  const lv = cvdHist[N_PTS - 1], lvY = cvdY(lv);
+  ctx.beginPath(); ctx.arc(CHART_X + CHART_W - 1, lvY, 5.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#32dc82'; ctx.shadowColor = '#32dc82'; ctx.shadowBlur = 14;
+  ctx.fill(); ctx.shadowBlur = 0;
+  ctx.beginPath(); ctx.arc(CHART_X + CHART_W - 1, lvY, 2.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.font = '800 13px Inter'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#32dc82'; ctx.shadowColor = '#32dc82'; ctx.shadowBlur = 8;
+  ctx.fillText('+' + Math.round(lv), CHART_X + CHART_W - 10, lvY - 16);
+  ctx.shadowBlur = 0;
+}
+
+// ══════════════════════════
+//  DRAW: Divergence Zone
+// ══════════════════════════
+function drawDivZone() {
+  const pulse = 0.62 + 0.38 * Math.sin(frameN * 0.16);
+
+  // Background fill
+  const zH = DIV_B - DIV_T;
+  const bg  = ctx.createLinearGradient(0, DIV_T, 0, DIV_B);
+  bg.addColorStop(0,   `rgba(245,200,66,${divMag * 0.07 * pulse})`);
+  bg.addColorStop(0.5, `rgba(255,165,30,${divMag * 0.14 * pulse})`);
+  bg.addColorStop(1,   `rgba(245,200,66,${divMag * 0.07 * pulse})`);
+  ctx.fillStyle = bg;
+  ctx.fillRect(CHART_X, DIV_T, CHART_W, zH);
+
+  // Top / bottom edge glow lines
+  if (divMag > 0.05) {
+    const edgeAlpha = divMag * 0.55 * pulse;
+    const edgeG = ctx.createLinearGradient(CHART_X, 0, CHART_X + CHART_W, 0);
+    edgeG.addColorStop(0, 'rgba(245,200,66,0)');
+    edgeG.addColorStop(0.5, `rgba(245,200,66,${edgeAlpha})`);
+    edgeG.addColorStop(1, 'rgba(245,200,66,0)');
+    ctx.fillStyle = edgeG;
+    ctx.fillRect(CHART_X, DIV_T, CHART_W, 2.5);
+    ctx.fillRect(CHART_X, DIV_B - 2.5, CHART_W, 2.5);
+  }
+
+  // Pressure bar (fills left→right with divMag)
+  if (divMag > 0.05) {
+    const barH  = 7, barY = DIV_B - 16;
+    const barW  = (CHART_W - 20) * divMag;
+    const barBg = ctx.createLinearGradient(CHART_X + 10, 0, CHART_X + 10 + CHART_W - 20, 0);
+    barBg.addColorStop(0, 'rgba(245,200,66,0.08)');
+    barBg.addColorStop(1, 'rgba(245,200,66,0.04)');
+    ctx.fillStyle = barBg;
+    ctx.beginPath(); ctx.roundRect(CHART_X + 10, barY, CHART_W - 20, barH, 3); ctx.fill();
+
+    const barFill = ctx.createLinearGradient(CHART_X + 10, 0, CHART_X + 10 + barW, 0);
+    barFill.addColorStop(0, 'rgba(245,200,66,0.38)');
+    barFill.addColorStop(1, `rgba(255,144,30,${0.5 + divMag * 0.35})`);
+    ctx.fillStyle = barFill;
+    ctx.shadowColor = '#f5c842'; ctx.shadowBlur = 8 + divMag * 10;
+    ctx.beginPath(); ctx.roundRect(CHART_X + 10, barY, barW, barH, 3); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Flow particles
+  for (const fp of flowParts) {
+    ctx.beginPath(); ctx.arc(fp.x, fp.y, fp.r, 0, Math.PI * 2);
+    ctx.fillStyle   = '#f5c842';
+    ctx.globalAlpha = fp.life * divMag * 0.8;
+    ctx.shadowColor = '#f5c842'; ctx.shadowBlur = 5;
+    ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // Downward arrows (animated flow)
+  if (divMag > 0.22) {
+    const nA     = Math.floor(divMag * 9);
+    const aPhase = (frameN * 0.055) % 1;
+    for (let i = 0; i < nA; i++) {
+      const ax  = CHART_X + 16 + (i / Math.max(1, nA - 1)) * (CHART_W - 32);
+      const ay  = DIV_T + 5 + aPhase * (zH - 14);
+      const alp = divMag * 0.45 * Math.max(0, 1 - Math.abs(aPhase - 0.5) * 1.8);
+      if (alp <= 0.01) continue;
+      ctx.globalAlpha = alp;
+      ctx.fillStyle   = '#f5c842';
+      ctx.beginPath();
+      ctx.moveTo(ax, ay + 5); ctx.lineTo(ax - 4, ay - 1); ctx.lineTo(ax + 4, ay - 1);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Center label
+  const cvdNow = cvdHist[N_PTS - 1];
+  ctx.save();
+  ctx.font = `700 11px Inter`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle   = `rgba(245,200,66,${0.22 + divMag * 0.55})`;
+  ctx.shadowColor = '#f5c842'; ctx.shadowBlur = divMag * 10;
+  const labelText = divMag > 0.05
+    ? `↓  CVD  +${Math.round(cvdNow)} BTC  —  Цена  $0.00  ↓`
+    : '─  дивергенция нарастает  ─';
+  ctx.fillText(labelText, CX, DIV_T + 16);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+// ══════════════════════════
+//  DRAW: Price Chart
+// ══════════════════════════
+function drawPriceChart() {
+  const cf = frameN % CYCLE, t = cf / CYCLE;
+  const inExp   = (Math.floor(frameN / CYCLE) === lastExpCyc) && t >= EXP_T;
+  const priceNow = prcHist[N_PTS - 1];
+
+  ctx.fillStyle = inExp ? 'rgba(3,12,8,0.97)' : 'rgba(3,7,18,0.97)';
+  ctx.fillRect(CHART_X, PRC_T, CHART_W, PRC_H);
+
+  // Green tint during explosion
+  if (inExp) {
+    const ep = Math.min(1, (t - EXP_T) / 0.15);
+    ctx.fillStyle = `rgba(50,220,130,${ep * 0.055})`;
+    ctx.fillRect(CHART_X, PRC_T, CHART_W, PRC_H);
+  }
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(CHART_X, PRC_T, CHART_W, PRC_H); ctx.clip();
+
+  // Grid
+  for (let v = P_MIN; v <= P_MAX; v += 50) {
+    const y = prcY(v);
+    if (y < PRC_T - 1 || y > PRC_B + 1) continue;
+    ctx.beginPath(); ctx.moveTo(CHART_X, y); ctx.lineTo(CHART_X + CHART_W, y);
+    ctx.strokeStyle = v === P_BASE ? `rgba(245,200,66,${0.12 + divMag * 0.1})` : 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = v === P_BASE ? 1 : 0.8;
+    if (v === P_BASE) ctx.setLineDash([7, 9]);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  // Scanlines
+  ctx.fillStyle = 'rgba(0,0,0,0.055)';
+  for (let sy = PRC_T; sy < PRC_B; sy += 4) ctx.fillRect(CHART_X, sy, CHART_W, 1.5);
+
+  // Price fill
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) {
+    const x = CHART_X + i, y = prcY(prcHist[i]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.lineTo(CHART_X + N_PTS - 1, PRC_B); ctx.lineTo(CHART_X, PRC_B); ctx.closePath();
+  const pf = ctx.createLinearGradient(0, PRC_T, 0, PRC_B);
+  if (inExp) { pf.addColorStop(0, 'rgba(50,220,130,0.14)'); pf.addColorStop(1, 'rgba(50,220,130,0.01)'); }
+  else       { pf.addColorStop(0, 'rgba(238,240,248,0.05)'); pf.addColorStop(1, 'rgba(238,240,248,0.01)'); }
+  ctx.fillStyle = pf; ctx.fill();
+
+  // Price line
+  const lCol = inExp ? '#32dc82' : 'rgba(238,240,248,0.65)';
+  const lGlow = inExp ? 18 : 4;
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) {
+    const x = CHART_X + i, y = prcY(prcHist[i]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = lCol; ctx.lineWidth = inExp ? 2.5 : 1.8;
+  ctx.shadowColor = lCol; ctx.shadowBlur = lGlow;
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  ctx.restore();
+
+  // Border
+  ctx.strokeStyle = inExp ? 'rgba(50,220,130,0.2)' : 'rgba(255,255,255,0.06)';
+  ctx.lineWidth   = 1; ctx.strokeRect(CHART_X, PRC_T, CHART_W, PRC_H);
+
+  // Y labels (compact, right of chart)
+  ctx.save();
+  ctx.font = '600 9px Inter'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  for (let v = P_MIN + 50; v < P_MAX; v += 50) {
+    const y = prcY(v);
+    if (y < PRC_T + 4 || y > PRC_B - 4) continue;
+    ctx.fillStyle = v === P_BASE ? 'rgba(245,200,66,0.28)' : 'rgba(255,255,255,0.1)';
+    ctx.fillText(v.toLocaleString(), CHART_X + CHART_W + 5, y);
+  }
+  ctx.restore();
+
+  // Title
+  ctx.font = '700 10px Inter'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillStyle = inExp ? 'rgba(50,220,130,0.38)' : 'rgba(238,240,248,0.22)';
+  ctx.fillText('ЦЕНА  BTC/USDT', CHART_X + 8, PRC_T + 6);
+
+  // Live dot
+  const liveY = prcY(priceNow);
+  ctx.beginPath(); ctx.arc(CHART_X + CHART_W - 1, liveY, 5.5, 0, Math.PI * 2);
+  ctx.fillStyle = lCol; ctx.shadowColor = lCol; ctx.shadowBlur = lGlow;
+  ctx.fill(); ctx.shadowBlur = 0;
+  ctx.beginPath(); ctx.arc(CHART_X + CHART_W - 1, liveY, 2.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+
+  // Delta label
+  const delta = priceNow - P_BASE;
+  if (Math.abs(delta) > 0.8) {
+    ctx.font = '800 13px Inter'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#32dc82'; ctx.shadowColor = '#32dc82'; ctx.shadowBlur = 12;
+    ctx.fillText('+$' + delta.toFixed(0), CHART_X + CHART_W - 10, liveY - 16);
+    ctx.shadowBlur = 0;
+  } else {
+    ctx.font = '700 11px Inter'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = `rgba(245,200,66,${0.18 + divMag * 0.22})`;
+    ctx.fillText('65,230.00  ⬡ FROZEN', CHART_X + CHART_W - 10, liveY - 14);
+  }
+}
+
+// ══════════════════════════
+//  DRAW: Annotation row
+// ══════════════════════════
+function drawAnnotation() {
+  const cf = frameN % CYCLE, t = cf / CYCLE;
+  const inExp = (Math.floor(frameN / CYCLE) === lastExpCyc) && t >= EXP_T;
+
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  if (bannerLife > 0) {
+    const pulse = 0.7 + 0.3 * Math.sin(frameN * 0.22);
+    ctx.globalAlpha = bannerLife;
+    ctx.font = '900 22px Inter'; ctx.fillStyle = '#32dc82';
+    ctx.shadowColor = '#32dc82'; ctx.shadowBlur = 22 * pulse;
+    ctx.fillText('+$' + bannerImpulse + '.00 — АЙСБЕРГ СЪЕЛИ', CX, ANN_Y);
+    ctx.shadowBlur = 0;
+    ctx.font = '600 11px Inter'; ctx.fillStyle = 'rgba(50,220,130,0.6)';
+    ctx.fillText('CVD давление высвободилось → импульс цены', CX, ANN_Y + 26);
+    ctx.globalAlpha = 1;
+  } else if (divMag > 0.08) {
+    ctx.font = '700 12px Inter';
+    ctx.fillStyle = `rgba(245,200,66,${0.25 + divMag * 0.45})`;
+    ctx.shadowColor = '#f5c842'; ctx.shadowBlur = divMag * 8;
+    ctx.fillText(`CVD ↑  +${Math.round(cvdHist[N_PTS-1])} BTC   ↔   Цена →  $0.00`, CX, ANN_Y);
+    ctx.shadowBlur = 0;
+    ctx.font = '600 10px Inter'; ctx.fillStyle = 'rgba(245,200,66,0.22)';
+    ctx.fillText('давление накапливается — уровень держится', CX, ANN_Y + 20);
+  }
+
+  ctx.restore();
+}
+
+// ══════════════════════════
+//  DRAW MAIN
+// ══════════════════════════
+function draw() {
+  let sx = 0, sy = 0;
+  if (shakeAmt > 0) { sx = rnd(-shakeAmt, shakeAmt); sy = rnd(-shakeAmt, shakeAmt); }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // Background
+  ctx.fillStyle = '#08090f';
+  ctx.fillRect(-30, -30, W + 60, H + 60);
+
+  // BG dots
+  for (const d of bgDots) {
+    ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+    ctx.fillStyle = d.col; ctx.globalAlpha = d.a; ctx.fill(); ctx.globalAlpha = 1;
+  }
+
+  // Ambient glow (div zone)
+  const ag = ctx.createRadialGradient(CX, DIV_MID, 0, CX, DIV_MID, 310);
+  ag.addColorStop(0, `rgba(245,180,30,${0.016 + divMag * 0.055})`);
+  ag.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = ag; ctx.fillRect(0, 0, W, H);
+
+  drawCvdChart();
+  drawDivZone();
+  drawPriceChart();
+  drawAnnotation();
+
+  // ── Rings ──
+  for (const rg of rings) {
+    ctx.beginPath(); ctx.arc(rg.x, rg.y, rg.r, 0, Math.PI * 2);
+    ctx.strokeStyle = rg.col;
+    ctx.lineWidth   = rg.life * (rg.thick ? 5 : 2.5);
+    ctx.globalAlpha = rg.life * 0.72;
+    ctx.shadowColor = rg.col; ctx.shadowBlur = 14;
+    ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // ── Lightnings ──
+  for (const l of lightnings) {
+    drawLightning(l.x1, l.y1, l.x2, l.y2, l.col, l.life * 0.88, l.thick ? 2.2 : 1.5);
+  }
+
+  // ── Particles ──
+  for (const p of parts) {
+    if (p.square) {
+      ctx.save(); ctx.globalAlpha = p.life; ctx.fillStyle = p.col;
+      ctx.shadowColor = p.col; ctx.shadowBlur = 5;
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillRect(-p.r, -p.r, p.r * 2, p.r * 2);
+      ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.3, p.r * p.life), 0, Math.PI * 2);
+      ctx.fillStyle = p.col; ctx.globalAlpha = p.life;
+      ctx.shadowColor = p.col; ctx.shadowBlur = 6;
+      ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+  }
+
+  // ── Sparks ──
+  for (const s of sparks) {
+    const ex = s.x - s.vx * s.len * (0.4 + s.life * 0.6);
+    const ey = s.y - s.vy * s.len * (0.4 + s.life * 0.6);
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(ex, ey);
+    ctx.strokeStyle = s.col; ctx.lineWidth = s.life * 2.2;
+    ctx.globalAlpha = s.life * 0.85;
+    ctx.shadowColor = s.col; ctx.shadowBlur = 6;
+    ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // ── Flashes ──
+  for (const f of flashes) {
+    const prog = 1 - f.life;
+    ctx.beginPath(); ctx.arc(f.x, f.y, 6 + prog * (f.big ? 72 : 40), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,200,80,${f.life * 0.42})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(f.x, f.y, 2 + prog * 22, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,220,${f.life * 0.9})`; ctx.fill();
+  }
+
+  // ── Float numbers ──
+  for (const fn of floatNums) {
+    ctx.font = fn.big ? `900 ${Math.round(20 + fn.life * 5)}px Inter` : `800 14px Inter`;
+    ctx.fillStyle = fn.col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = fn.life;
+    ctx.shadowColor = fn.col; ctx.shadowBlur = fn.big ? 20 : 10;
+    ctx.fillText(fn.text, fn.x, fn.y);
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+
+  // Screen flash (no shake offset)
+  if (screenFlash > 0) {
+    if (screenFlash > 0.8) {
+      ctx.fillStyle = `rgba(255,255,255,${(screenFlash - 0.8) * 0.52})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.fillStyle = `rgba(245,200,66,${Math.min(1, screenFlash) * 0.24})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+// ── Loop ──
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+</script>
+</body>
+</html>
