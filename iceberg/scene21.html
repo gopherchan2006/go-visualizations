@@ -1,0 +1,457 @@
+<html lang="ru"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene 2 — Аналогия айсберга</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #050608;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* ── 9:16 frame ── */
+.frame {
+  width: 540px;
+  height: 960px;
+  background: #080b18;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 4px;
+  box-shadow: 0 0 100px rgba(0,0,0,0.9);
+}
+
+/* ── SVG scene (full 960px) ── */
+.scene-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 540px;
+  height: 960px;
+  display: block;
+}
+
+/* ── Iceberg bob: tip and body move in sync ── */
+#iceTip, #iceBody {
+  animation: iceBob 4.5s ease-in-out infinite;
+}
+@keyframes iceBob {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-10px); }
+}
+
+/* ── Waves flow ── */
+.wave1 { animation: waveFlow 3.8s linear infinite; }
+.wave2 { animation: waveFlow 5.5s linear infinite reverse; opacity: 0.45; }
+@keyframes waveFlow {
+  from { transform: translateX(0px); }
+  to   { transform: translateX(-270px); }
+}
+
+/* ── Stars ── */
+.s1 { animation: twinkle 2.6s ease-in-out infinite; }
+.s2 { animation: twinkle 3.4s ease-in-out infinite 0.8s; }
+.s3 { animation: twinkle 4.1s ease-in-out infinite 1.5s; }
+.s4 { animation: twinkle 2.9s ease-in-out infinite 2.1s; }
+.s5 { animation: twinkle 3.7s ease-in-out infinite 0.4s; }
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 0.95; }
+}
+
+/* ── Water overlay: periodic reveal ── */
+#waterOverlay {
+  animation: waterReveal 7s ease-in-out infinite;
+}
+@keyframes waterReveal {
+  0%, 28%, 100% { opacity: 1; }
+  52%, 70%      { opacity: 0.22; }
+}
+
+/* ── Labels ── */
+.lbl {
+  position: absolute;
+  right: 24px;
+  text-align: right;
+  opacity: 0;
+  animation: lblFadeIn 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+@keyframes lblFadeIn {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.lbl-vis { top: 90px;  animation-delay: 0.4s; }
+.lbl-hid { top: 470px; animation-delay: 1.0s; }
+
+.lbl-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.lbl-vis .lbl-tag { color: rgba(160,210,255,0.6); }
+.lbl-hid .lbl-tag {
+  color: rgba(245,200,66,0.7);
+  animation: hidTagPulse 7s ease-in-out infinite 1.0s;
+}
+@keyframes hidTagPulse {
+  0%, 28%, 100% { color: rgba(245,200,66,0.7); }
+  52%, 70%      { color: rgba(255,155,40,0.95); }
+}
+
+.lbl-amount {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.lbl-vis .lbl-amount { color: #cce0f8; }
+.lbl-hid .lbl-amount {
+  color: #f5c842;
+  text-shadow: 0 0 22px rgba(245,200,66,0.45);
+  animation: hidAmtPulse 7s ease-in-out infinite 1.0s;
+}
+@keyframes hidAmtPulse {
+  0%, 28%, 100% { text-shadow: 0 0 22px rgba(245,200,66,0.45); }
+  52%, 70%      { text-shadow: 0 0 45px rgba(255,150,30,0.95); color: #ffaa30; }
+}
+
+.lbl-sub {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.2);
+  margin-top: 5px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Waterline label ── */
+.wl-lbl {
+  position: absolute;
+  top: 264px; left: 24px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(55,130,255,0.42);
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  opacity: 0;
+  animation: lblFadeIn 0.8s ease-out forwards 0.15s;
+}
+
+/* ── Bottom panel (y: 600–960) ── */
+.bottom-panel {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 370px;
+  background: linear-gradient(to bottom,
+    rgba(8,11,24,0) 0%,
+    rgba(8,11,24,0.96) 12%,
+    rgba(8,11,24,1) 18%
+  );
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 28px 40px;
+  gap: 16px;
+}
+
+.panel-heading {
+  font-size: 10px;
+  font-weight: 700;
+  color: #22284a;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  margin-bottom: 2px;
+}
+
+/* Comparison bars */
+.comp-table { display: flex; flex-direction: column; gap: 14px; }
+
+.comp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.c-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  min-width: 90px;
+}
+.c-lbl.vis { color: #3a6a9a; }
+.c-lbl.hid { color: #a08010; }
+
+.c-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.c-fill {
+  height: 100%;
+  border-radius: 3px;
+  width: 0;
+}
+.c-fill.vis {
+  background: linear-gradient(90deg, #1a4880, #3a80d0);
+  animation: barVis 2.2s ease-out forwards 0.6s;
+}
+.c-fill.hid {
+  background: linear-gradient(90deg, #906800, #f5c842);
+  animation: barHid 2.2s ease-out forwards 0.9s;
+  box-shadow: 0 0 10px rgba(245,200,66,0.4);
+}
+@keyframes barVis { to { width: 1%; } }
+@keyframes barHid { to { width: 100%; } }
+
+.c-num {
+  font-size: 14px;
+  font-weight: 800;
+  min-width: 82px;
+  text-align: right;
+  letter-spacing: -0.3px;
+}
+.c-num.vis { color: #3a6a9a; }
+.c-num.hid {
+  color: #f5c842;
+  text-shadow: 0 0 10px rgba(245,200,66,0.35);
+}
+
+/* Ratio badge */
+.ratio-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ratio-div {
+  flex: 1;
+  height: 1px;
+  background: rgba(255,255,255,0.05);
+}
+.ratio-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 22px;
+  background: rgba(245,200,66,0.07);
+  border: 1px solid rgba(245,200,66,0.18);
+  border-radius: 10px;
+  opacity: 0;
+  animation: badgeIn 0.8s ease-out forwards 1.6s;
+}
+@keyframes badgeIn {
+  from { opacity: 0; transform: scale(0.82); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.ratio-x {
+  font-size: 32px;
+  font-weight: 800;
+  color: #f5c842;
+  letter-spacing: -1px;
+  text-shadow: 0 0 24px rgba(245,200,66,0.55);
+}
+.ratio-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5a4010;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <!-- ══ SVG: Iceberg scene ══════════════════════════════════ -->
+  <svg class="scene-svg" viewBox="0 0 540 960" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- Sky gradient -->
+      <linearGradient id="gSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#05071a"></stop>
+        <stop offset="100%" stop-color="#0b1438"></stop>
+      </linearGradient>
+
+      <!-- Iceberg tip: bright white-blue -->
+      <linearGradient id="gTip" x1="0.35" y1="0" x2="0.65" y2="1">
+        <stop offset="0%" stop-color="#f2f8ff"></stop>
+        <stop offset="55%" stop-color="#b4d2f6"></stop>
+        <stop offset="100%" stop-color="#84aee0"></stop>
+      </linearGradient>
+
+      <!-- Iceberg body: dark blue (underwater) -->
+      <linearGradient id="gBody" x1="0.1" y1="0" x2="0.9" y2="1">
+        <stop offset="0%" stop-color="#183572"></stop>
+        <stop offset="100%" stop-color="#040e2a"></stop>
+      </linearGradient>
+
+      <!-- Water overlay -->
+      <linearGradient id="gWater" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#020c26"></stop>
+        <stop offset="100%" stop-color="#01070f"></stop>
+      </linearGradient>
+
+      <!-- Water surface shimmer -->
+      <linearGradient id="gSurface" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="rgba(35,100,230,0.18)"></stop>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"></stop>
+      </linearGradient>
+
+      <!-- Tip glow filter -->
+      <filter id="fTip" x="-28%" y="-28%" width="156%" height="156%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="b"></feGaussianBlur>
+        <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+      </filter>
+
+      <!-- Body glow filter -->
+      <filter id="fBody" x="-12%" y="-8%" width="124%" height="116%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"></feGaussianBlur>
+        <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+      </filter>
+    </defs>
+
+    <!-- Sky -->
+    <rect width="540" height="960" fill="url(#gSky)"></rect>
+
+    <!-- Stars -->
+    <circle class="s3" cx="78" cy="46" r="1.5" fill="white" opacity="0.3"></circle>
+    <circle class="s1" cx="148" cy="90" r="1.2" fill="white" opacity="0.25"></circle>
+    <circle class="s4" cx="416" cy="36" r="2" fill="white" opacity="0.45"></circle>
+    <circle class="s2" cx="470" cy="108" r="1.5" fill="white" opacity="0.3"></circle>
+    <circle class="s5" cx="54" cy="145" r="1" fill="white" opacity="0.25"></circle>
+    <circle class="s1" cx="386" cy="76" r="1.2" fill="white" opacity="0.35"></circle>
+    <circle class="s3" cx="506" cy="55" r="1.5" fill="white" opacity="0.28"></circle>
+    <circle class="s2" cx="134" cy="35" r="1" fill="white" opacity="0.22"></circle>
+    <circle class="s4" cx="310" cy="55" r="1" fill="white" opacity="0.2"></circle>
+
+    <!-- Moon atmosphere -->
+    <circle cx="450" cy="66" r="26" fill="rgba(180,210,255,0.035)"></circle>
+    <circle cx="450" cy="66" r="14" fill="rgba(210,230,255,0.055)"></circle>
+
+    <!-- ── Iceberg BODY (drawn before water overlay so water hides it) ── -->
+    <!--
+      Shape: irregular organic polygon, clearly larger than the tip.
+      Spans x≈118–420, y=272–640. Widest around y=420.
+    -->
+    <path id="iceBody" d="M 216,272
+         C 193,298 162,342 140,394
+         C 118,446 110,508 120,560
+         C 126,618 152,668 196,720
+         C 224,756 236,820 238,960
+         L 302,960
+         C 304,820 316,756 344,720
+         C 388,668 414,618 420,560
+         C 432,506 428,460 414,414
+         C 400,368 372,320 348,288
+         C 336,274 326,270 318,272
+         Z" fill="url(#gBody)" opacity="0.92" filter="url(#fBody)"></path>
+
+    <!-- ── Water overlay (semi-transparent rectangle, hides body) ── -->
+    <rect id="waterOverlay" x="0" y="272" width="540" height="688" fill="url(#gWater)" opacity="0.82"></rect>
+
+    <!-- Water surface shimmer band -->
+    <rect x="0" y="272" width="540" height="55" fill="url(#gSurface)"></rect>
+
+    <!-- Subtle underwater caustics -->
+    <g opacity="0.065">
+      <path d="M 98,325 Q 160,312 222,327 Q 284,342 346,325 Q 396,312 444,322" stroke="#2870ff" stroke-width="1.5" fill="none" stroke-linecap="round"></path>
+      <path d="M 80,392 Q 158,377 228,393 Q 298,409 368,392 Q 418,380 462,389" stroke="#1d60e0" stroke-width="1" fill="none" stroke-linecap="round"></path>
+      <path d="M 108,468 Q 188,452 260,468 Q 332,484 404,466 Q 442,456 476,463" stroke="#1650c8" stroke-width="1" fill="none" stroke-linecap="round"></path>
+    </g>
+
+    <!-- ── Waves at waterline (2x wide for seamless loop) ── -->
+    <path class="wave1" d="M-270,264 Q-202,253 -135,264 Q-67,275 0,264 Q67,253 135,264 Q202,275 270,264 Q337,253 405,264 Q472,275 540,264 Q607,253 675,264 Q742,275 810,264
+         L810,282 Q742,293 675,282 Q607,271 540,282 Q472,293 405,282 Q337,271 270,282 Q202,293 135,282 Q67,271 0,282 Q-67,293 -135,282 Q-202,271 -270,282 Z" fill="rgba(36,100,225,0.3)"></path>
+    <path class="wave2" d="M-270,267 Q-202,260 -135,267 Q-67,274 0,267 Q67,260 135,267 Q202,274 270,267 Q337,260 405,267 Q472,274 540,267 Q607,260 675,267 Q742,274 810,267
+         L810,277 Q742,284 675,277 Q607,270 540,277 Q472,284 405,277 Q337,270 270,277 Q202,284 135,277 Q67,270 0,277 Q-67,284 -135,277 Q-202,270 -270,277 Z" fill="rgba(55,140,255,0.14)"></path>
+
+    <!-- ── Iceberg TIP (above waterline, on top of water overlay) ── -->
+    <!--
+      Shape: organic irregular peak. Spans x≈215–325, y=65–272.
+      Noticeably smaller than the body — about 1:5 area ratio.
+    -->
+    <path id="iceTip" d="M 216,272
+         C 205,250 194,230 196,200
+         C 198,170 218,142 240,112
+         C 253,93 264,76 271,63
+         C 278,75 292,94 310,122
+         C 328,150 336,180 336,210
+         C 336,238 328,258 320,272
+         Z" fill="url(#gTip)" filter="url(#fTip)" stroke="rgba(255,255,255,0.12)" stroke-width="0.5"></path>
+
+    <!-- Tip sparkle highlight (peak) -->
+    <path d="M 254,106 C 262,90 268,74 271,63 C 274,74 280,90 284,105" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" fill="none" stroke-linecap="round"></path>
+
+    <!-- Second facet highlight on tip -->
+    <path d="M 304,155 C 316,140 328,148 336,160" stroke="rgba(220,240,255,0.18)" stroke-width="1" fill="none" stroke-linecap="round"></path>
+
+    <!-- Waterline -->
+    <line x1="0" y1="272" x2="540" y2="272" stroke="rgba(50,130,255,0.4)" stroke-width="1"></line>
+
+    <!-- ── Connector lines to labels ── -->
+    <!-- Visible: tip right edge (~322,188) → label area (~504,117) -->
+    <line x1="324" y1="186" x2="502" y2="117" stroke="rgba(155,205,255,0.16)" stroke-dasharray="4,5" stroke-width="1"></line>
+    <!-- Hidden: body right edge (~416,490) → label area (~502,490) -->
+    <line x1="414" y1="492" x2="500" y2="492" stroke="rgba(245,200,66,0.16)" stroke-dasharray="4,5" stroke-width="1"></line>
+
+  </svg>
+  <!-- ════════════════════════════════════════════════════════ -->
+
+  <!-- Waterline label -->
+  <div class="wl-lbl">— уровень воды</div>
+
+  <!-- Visible label (above water) -->
+  <div class="lbl lbl-vis">
+    <div class="lbl-tag">Видимо в стакане</div>
+    <div class="lbl-amount">50 BTC</div>
+    <div class="lbl-sub">верхушка айсберга</div>
+  </div>
+
+  <!-- Hidden label (below water) -->
+  <div class="lbl lbl-hid">
+    <div class="lbl-tag">Скрыто от рынка</div>
+    <div class="lbl-amount">5,000 BTC</div>
+    <div class="lbl-sub">скрытый резерв</div>
+  </div>
+
+  <!-- ── Bottom panel ── -->
+  <div class="bottom-panel">
+
+    <div class="panel-heading">Сравнение объёмов</div>
+
+    <div class="comp-table">
+      <div class="comp-row">
+        <span class="c-lbl vis">Видимо</span>
+        <div class="c-track"><div class="c-fill vis"></div></div>
+        <span class="c-num vis">50 BTC</span>
+      </div>
+      <div class="comp-row">
+        <span class="c-lbl hid">Скрыто</span>
+        <div class="c-track"><div class="c-fill hid"></div></div>
+        <span class="c-num hid">5,000 BTC</span>
+      </div>
+    </div>
+
+    <div class="ratio-row">
+      <div class="ratio-div"></div>
+      <div class="ratio-badge">
+        <span class="ratio-x">×100</span>
+        <span class="ratio-lbl">разница</span>
+      </div>
+      <div class="ratio-div"></div>
+    </div>
+
+  </div>
+
+</div>
+
+
+</body></html>
