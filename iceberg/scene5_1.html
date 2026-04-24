@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene 5 — Z-Score Детектор</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #050608;
+  display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; font-family: 'Inter', sans-serif;
+}
+.frame {
+  width: 540px; height: 960px; position: relative; overflow: hidden;
+  background: #08090f; border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px; box-shadow: 0 0 80px rgba(0,0,0,0.9);
+}
+canvas { position: absolute; top: 0; left: 0; width: 540px; height: 960px; z-index: 1; }
+
+/* ── Header ── */
+.hdr {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  padding: 22px 28px 18px; display: flex; justify-content: space-between; align-items: flex-start;
+  background: linear-gradient(180deg, rgba(8,9,15,0.97) 60%, transparent 100%);
+}
+.hdr-pair { font-size: 24px; font-weight: 800; color: #eef0f8; letter-spacing: 0.3px; }
+.hdr-pair em { color: rgba(238,240,248,0.28); font-style: normal; font-weight: 500; }
+.hdr-sub { font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.8px; text-transform: uppercase; margin-top: 5px; }
+.hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.ice-tag {
+  padding: 4px 11px; border-radius: 7px;
+  background: rgba(245,200,66,0.1); border: 1px solid rgba(245,200,66,0.28);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #f5c842;
+  text-shadow: 0 0 8px rgba(245,200,66,0.7);
+  animation: icePulse 1.4s ease-in-out infinite;
+}
+@keyframes icePulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+.live-badge { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.5px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 8px rgba(46,204,113,0.9); animation: ldBlink 2s ease-in-out infinite; }
+@keyframes ldBlink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* ── Readout band ── */
+.readout {
+  position: absolute; top: 108px; left: 0; right: 0; z-index: 3;
+  height: 60px; display: flex; align-items: stretch;
+  background: rgba(8,9,15,0.94);
+  border-top: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,144,48,0.08);
+}
+.rd-blk {
+  flex: 1; display: flex; flex-direction: column; justify-content: center;
+  padding: 0 18px; gap: 3px;
+}
+.rd-blk.ctr { align-items: center; border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); }
+.rd-lbl { font-size: 9px; font-weight: 700; color: #1a2235; letter-spacing: 1.8px; text-transform: uppercase; }
+.rd-big {
+  font-size: 28px; font-weight: 800; letter-spacing: -0.8px; line-height: 1;
+  color: #ff9030; text-shadow: 0 0 14px rgba(255,144,48,0.4);
+  transition: color 0.15s, text-shadow 0.15s;
+}
+.rd-big.g { color: #32dc82; text-shadow: 0 0 12px rgba(50,220,130,0.35); }
+.rd-delta { font-size: 10px; font-weight: 600; color: #1a2840; transition: color 0.2s; }
+
+/* ── Terminal ── */
+.terminal {
+  position: absolute; top: 500px; left: 14px; right: 14px; z-index: 3;
+  background: rgba(3, 7, 18, 0.96);
+  border: 1px solid rgba(255,255,255,0.07); border-radius: 14px;
+  overflow: hidden; backdrop-filter: blur(20px);
+}
+.term-bar {
+  height: 34px; display: flex; align-items: center;
+  padding: 0 14px; gap: 10px;
+  background: rgba(255,255,255,0.022);
+  border-bottom: 1px solid rgba(255,255,255,0.055);
+}
+.trafic { display: flex; gap: 6px; }
+.tc { width: 10px; height: 10px; border-radius: 50%; opacity: 0.85; }
+.term-title { font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.18); letter-spacing: 0.3px; font-family: 'JetBrains Mono', monospace; }
+.term-body { padding: 10px 16px 13px; }
+.tl {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px; line-height: 1.78;
+  min-height: 22px; white-space: pre;
+  letter-spacing: -0.2px;
+}
+.tl.cmd    { color: #d0d8f0; }
+.tl.ok     { color: #32dc82; }
+.tl.info   { color: #5a7ea0; }
+.tl.data   { color: #7882a0; }
+.tl.alert  { color: #f5c842; font-weight: 700; text-shadow: 0 0 14px rgba(245,200,66,0.65); }
+.tl.detail { color: #ff9030; }
+.tl.flash  { animation: tFlash 0.18s ease-in-out 5; }
+@keyframes tFlash { 0%,100%{opacity:1} 50%{opacity:0.1} }
+
+/* ── Stats ── */
+.stats {
+  position: absolute; bottom: 92px; left: 0; right: 0; z-index: 3;
+  display: flex; padding: 0 16px; gap: 8px;
+}
+.s-box {
+  flex: 1; background: rgba(8,9,15,0.88); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.055); border-radius: 14px;
+  padding: 14px 12px 12px; display: flex; flex-direction: column; gap: 3px;
+}
+.s-box.accent { border-color: rgba(245,200,66,0.2); }
+.s-lbl { font-size: 9px; font-weight: 700; color: #1a2235; letter-spacing: 1.8px; text-transform: uppercase; }
+.s-val { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+.s-val.y { color: #f5c842; text-shadow: 0 0 12px rgba(245,200,66,0.35); }
+.s-val.r { color: #ff5c5c; text-shadow: 0 0 10px rgba(255,92,92,0.35); }
+.s-val.g { color: #32dc82; text-shadow: 0 0 10px rgba(50,220,130,0.3); }
+.s-sub { font-size: 10px; font-weight: 500; color: #1a2235; }
+
+/* ── Footer ── */
+.footer {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  height: 90px; padding: 16px 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(0deg, rgba(8,9,15,0.98) 65%, transparent 100%);
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.f-lbl { font-size: 10px; font-weight: 700; color: #1a2235; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+.f-price { font-size: 28px; font-weight: 800; color: #eef0f8; letter-spacing: -0.5px; }
+.frozen-tag {
+  padding: 4px 12px; border-radius: 7px;
+  background: rgba(50,220,130,0.08); border: 1px solid rgba(50,220,130,0.2);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #32dc82;
+  animation: ldBlink 2.2s ease-in-out infinite;
+}
+.f-delta { font-size: 12px; font-weight: 600; color: #172a22; margin-top: 5px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <div class="hdr">
+    <div>
+      <div class="hdr-pair">BTC<em>/USDT</em></div>
+      <div class="hdr-sub">Z-Score детектор — live сигнал</div>
+    </div>
+    <div class="hdr-right">
+      <div class="ice-tag">⬡ ICE</div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>
+  </div>
+
+  <div class="readout">
+    <div class="rd-blk">
+      <span class="rd-lbl">Z-Score</span>
+      <span class="rd-big" id="rdZ">0.00</span>
+    </div>
+    <div class="rd-blk ctr">
+      <span class="rd-lbl">Порог</span>
+      <span class="rd-big" style="color:rgba(255,65,65,0.52);text-shadow:none">3.00</span>
+      <span class="rd-delta" id="rdDelta">↑ 3.00 до порога</span>
+    </div>
+    <div class="rd-blk" style="align-items:flex-end">
+      <span class="rd-lbl">CVD Δ BTC</span>
+      <span class="rd-big g" id="rdCvd">+0</span>
+    </div>
+  </div>
+
+  <div class="terminal">
+    <div class="term-bar">
+      <div class="trafic">
+        <div class="tc" style="background:#ff5f57"></div>
+        <div class="tc" style="background:#ffbd2e"></div>
+        <div class="tc" style="background:#28ca41"></div>
+      </div>
+      <span class="term-title">iceberg-detector — go run . --pair=BTCUSDT --win=30s</span>
+    </div>
+    <div class="term-body">
+      <div class="tl cmd"    id="tl0"></div>
+      <div class="tl ok"     id="tl1"></div>
+      <div class="tl info"   id="tl2"></div>
+      <div class="tl data"   id="tl3"></div>
+      <div class="tl data"   id="tl4"></div>
+      <div class="tl data"   id="tl5"></div>
+      <div class="tl"        id="tl6">&nbsp;</div>
+      <div class="tl alert"  id="tl7"></div>
+      <div class="tl detail" id="tl8"></div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="s-box accent">
+      <div class="s-lbl">Детекций</div>
+      <div class="s-val y" id="sDet">0</div>
+      <div class="s-sub">сигналов ICE</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">Z-max</div>
+      <div class="s-val r" id="sZmax">0.00</div>
+      <div class="s-sub">пиковый</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">CVD Δ</div>
+      <div class="s-val g" id="sCvd">+0</div>
+      <div class="s-sub">нарастающий</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <div class="f-lbl">Last Price</div>
+      <div class="f-price">65,230.00</div>
+    </div>
+    <div style="text-align:right">
+      <div class="frozen-tag">FROZEN</div>
+      <div class="f-delta">Δ 0.00 USD (0.000%)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 540, H = 960, CX = 270;
+
+// Chart geometry
+const CHART_X  = 44;
+const CHART_Y  = 172;
+const CHART_W  = 484;
+const CHART_H  = 320;
+const CHART_B  = CHART_Y + CHART_H;   // 492
+const Y_MAX    = 4.5;
+const Y_THRESH = 3.0;
+const THRESH_Y = CHART_B - (Y_THRESH / Y_MAX) * CHART_H;  // ≈ 279
+
+const N_PTS  = CHART_W;   // one data point per pixel
+const CYCLE  = 480;       // frames per detection cycle (~8s at 60fps)
+
+// Data arrays
+let zData   = new Array(N_PTS).fill(1.2);
+let cvdData = new Array(N_PTS).fill(0);
+
+// State
+let frameN      = 0;
+let zProximity  = 0;   // 0→1 as z approaches threshold
+let detectedAt  = -9999;
+let detectedZ   = 0;
+let detectedCvd = 0;
+let bannerLife  = 0;   // 0 hidden, 0→1 fade in, 1 = shown
+let screenFlash = 0;
+let shakeAmt    = 0;
+
+// Stats
+let detectionCount = 0;
+let zMax           = 0;
+let cvdTotal       = 0;
+
+// Effect arrays
+let parts      = [];
+let sparks     = [];
+let rings      = [];
+let flashes    = [];
+let lightnings = [];
+let floatNums  = [];
+let lineWarns  = [];   // sparks sliding along threshold line
+let bgDots     = [];
+
+// Terminal elements
+const TL = Array.from({length: 9}, (_, i) => document.getElementById('tl' + i));
+
+// Terminal script (lines 0-5; 6-8 triggered by detection)
+const TERM_SCRIPT = [
+  { text: '$ go run . --pair=BTCUSDT --win=30s', startT: 0.02  },
+  { text: '  [init] binance ws connected  ✓',    startT: 0.10  },
+  { text: '  [stream] collecting trades...',      startT: 0.20  },
+  { text: '  cvd_delta  +112 → +310 → +524',     startT: 0.325 },
+  { text: '  z_score    1.2  → 1.9  → 2.6',      startT: 0.46  },
+  { text: '  duration   4s  → 8s  → 12s',         startT: 0.62  },
+];
+let termReveal = new Array(6).fill(0);
+
+// Ambient background dust
+function rnd(a, b) { return a + Math.random() * (b - a); }
+for (let i = 0; i < 42; i++) {
+  bgDots.push({
+    x: rnd(0,W), y: rnd(0,H),
+    vx: rnd(-0.07, 0.07), vy: rnd(-0.05, 0.05),
+    r: rnd(0.4, 1.5), a: rnd(0.02, 0.08),
+    col: Math.random() > 0.5 ? '#ff9030' : '#32dc82'
+  });
+}
+
+// ── Data generators ──
+function genZ(f) {
+  const cycleF = f % CYCLE;
+  const t = cycleF / CYCLE;
+  const n = Math.sin(f*0.22)*0.18 + Math.sin(f*0.09)*0.12 + Math.sin(f*0.51)*0.07;
+  if (t < 0.76) {
+    return Math.max(0.4, 1.2 + t * 1.45 + n);
+  } else if (t < 0.80) {
+    const c   = (t - 0.76) / 0.04;
+    const nn  = n * (1 - c);   // noise fades during final climb
+    return 1.2 + 0.76 * 1.45 + nn + c * 1.4;
+  } else {
+    return 3.05 + Math.abs(n) * 0.55;
+  }
+}
+
+function genCVD(f) {
+  const t = (f % CYCLE) / CYCLE;
+  return Math.max(0, t * 870 + Math.sin(f * 0.14) * 22);
+}
+
+function genCVDNorm(f) { return genCVD(f) / 210; }
+
+// ── Pixel mapping ──
+function yPx(v) { return CHART_B - (v / Y_MAX) * CHART_H; }
+
+// ── Lightning ──
+function drawLightning(x1, y1, x2, y2, col, alpha, w) {
+  const pts = [{x: x1, y: y1}];
+  for (let i = 1; i < 6; i++) {
+    const t = i / 6;
+    pts.push({x: x1+(x2-x1)*t+rnd(-16,16), y: y1+(y2-y1)*t+rnd(-14,14)});
+  }
+  pts.push({x: x2, y: y2});
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, alpha);
+  ctx.strokeStyle = col; ctx.lineWidth = w;
+  ctx.shadowColor = col; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = w * 0.28; ctx.shadowBlur = 4;
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── Detection trigger ──
+function triggerDetection(curZ, curCvd) {
+  detectedAt    = frameN;
+  detectedZ     = curZ;
+  detectedCvd   = curCvd;
+  bannerLife    = 0.01;
+  screenFlash   = 1.5;
+  shakeAmt      = 14;
+  detectionCount++;
+  cvdTotal     += curCvd;
+  if (curZ > zMax) zMax = curZ;
+
+  const ix = CHART_X + CHART_W - 1;
+  const iy = THRESH_Y;
+
+  // Flash
+  flashes.push({x: ix, y: iy, life: 1});
+
+  // Circle particles
+  for (let i = 0; i < 46; i++) {
+    const a = rnd(-Math.PI, Math.PI);
+    const s = rnd(1.5, 11);
+    parts.push({
+      x: ix, y: iy, vx: Math.cos(a)*s, vy: Math.sin(a)*s,
+      r: rnd(2, 7), life: 1,
+      col: Math.random() > 0.4 ? '#f5c842' : (Math.random() > 0.5 ? '#ff5c5c' : '#ff9030')
+    });
+  }
+
+  // Line sparks
+  for (let i = 0; i < 24; i++) {
+    const a = rnd(-Math.PI, Math.PI);
+    const s = rnd(5, 19);
+    sparks.push({
+      x: ix, y: iy, vx: Math.cos(a)*s, vy: Math.sin(a)*s,
+      life: 1, len: rnd(10, 32), col: i%2 === 0 ? '#f5c842' : '#ff7733'
+    });
+  }
+
+  // Debris squares
+  for (let i = 0; i < 10; i++) {
+    const a = rnd(0, Math.PI*2);
+    parts.push({
+      x: ix, y: iy, vx: Math.cos(a)*rnd(2,8), vy: Math.sin(a)*rnd(2,6),
+      r: rnd(3.5, 8), life: 1,
+      col: '#ff4422', square: true, rot: rnd(0,Math.PI), rotV: rnd(-0.28,0.28)
+    });
+  }
+
+  // Rings: first big one + 4 delayed
+  rings.push({x: CX, y: iy, r: 0, maxR: 290, life: 1, col: '#f5c842', thick: true});
+  for (let i = 1; i <= 4; i++) {
+    setTimeout(() => {
+      rings.push({x: CX, y: iy, r: i*8, maxR: 200+i*50, life: 1, col: i%2===0 ? '#ff5c5c' : '#f5c842', thick: false});
+    }, i * 85);
+  }
+
+  // Lightning bolts from crossing point
+  for (let i = 0; i < 7; i++) {
+    const a = rnd(0, Math.PI*2);
+    lightnings.push({
+      x1: ix, y1: iy,
+      x2: Math.max(CHART_X+5, Math.min(W-5, ix + Math.cos(a)*rnd(55, 210))),
+      y2: Math.max(CHART_Y+8, Math.min(CHART_B+50, iy + Math.sin(a)*rnd(30, 140))),
+      life: 1.2, col: '#f5c842', thick: true
+    });
+  }
+
+  // Float Z-value
+  floatNums.push({x: CX, y: CHART_Y + 50, text: 'Z = ' + curZ.toFixed(2), life: 1, vy: -1.1});
+
+  // Terminal — lines 7-8
+  TL[6].textContent = '';
+  TL[7].textContent = '[ICE DETECTED]  price=65230.00';
+  TL[7].classList.add('flash');
+  setTimeout(() => { TL[7].classList.remove('flash'); }, 1100);
+  setTimeout(() => {
+    TL[8].textContent = '  cvd=+' + Math.round(curCvd) + '  z=' + curZ.toFixed(1) + '  dur=14s';
+  }, 340);
+
+  updateStats();
+}
+
+function updateStats() {
+  document.getElementById('sDet').textContent  = detectionCount;
+  document.getElementById('sZmax').textContent = zMax.toFixed(2);
+  document.getElementById('sCvd').textContent  = '+' + Math.round(cvdTotal);
+}
+
+// ── Terminal typewriter ──
+let lastCycleIdx = -1;
+
+function updateTerminal(cycleF) {
+  const cycleIdx = Math.floor(frameN / CYCLE);
+
+  // Reset at start of new cycle
+  if (cycleIdx !== lastCycleIdx) {
+    lastCycleIdx = cycleIdx;
+    for (let i = 0; i < 6; i++) { TL[i].textContent = ''; termReveal[i] = 0; }
+    // Clear detection lines only if not freshly shown
+    if (frameN - detectedAt > 60) {
+      TL[7].textContent = ''; TL[8].textContent = '';
+    }
+  }
+
+  const t = cycleF / CYCLE;
+  for (let i = 0; i < TERM_SCRIPT.length; i++) {
+    const line = TERM_SCRIPT[i];
+    if (t < line.startT) break;
+    if (termReveal[i] >= line.text.length) continue;
+    const frames   = cycleF - Math.round(line.startT * CYCLE);
+    const newRev   = Math.min(line.text.length, Math.floor(frames * 5));
+    if (newRev > termReveal[i]) {
+      termReveal[i] = newRev;
+      const cursor = newRev < line.text.length ? '▋' : '';
+      TL[i].textContent = line.text.slice(0, newRev) + cursor;
+    }
+  }
+}
+
+// ── UPDATE ──
+function update() {
+  frameN++;
+  const cycleF = frameN % CYCLE;
+
+  const curZ   = genZ(frameN);
+  const prevZ  = genZ(frameN - 1);
+  const curCvd = genCVD(frameN);
+
+  // Push new data
+  zData.push(curZ);     zData.shift();
+  cvdData.push(genCVDNorm(frameN)); cvdData.shift();
+
+  // Proximity (0→1 as z: 2.0→3.0)
+  zProximity = Math.max(0, Math.min(1, (curZ - 2.0) / 1.0));
+
+  // Detection crossing
+  if (prevZ < Y_THRESH && curZ >= Y_THRESH && frameN - detectedAt > CYCLE * 0.5) {
+    triggerDetection(curZ, curCvd);
+  }
+
+  // Banner hide before next cycle reset
+  if (bannerLife >= 1 && cycleF > CYCLE * 0.95) {
+    bannerLife = Math.max(0, bannerLife - 0.06);
+  }
+
+  // Readout band DOM
+  const rdZ = document.getElementById('rdZ');
+  rdZ.textContent = curZ.toFixed(2);
+  if (curZ >= Y_THRESH) {
+    rdZ.style.color      = '#ff3333';
+    rdZ.style.textShadow = '0 0 18px rgba(255,40,40,0.85)';
+  } else {
+    const r = Math.round(255 * (0.55 + zProximity * 0.45));
+    const g = Math.round(144 * (1 - zProximity * 0.8));
+    rdZ.style.color      = `rgb(${r},${g},48)`;
+    rdZ.style.textShadow = `0 0 ${10+zProximity*18}px rgba(${r},${g},48,${0.35+zProximity*0.45})`;
+  }
+
+  const delta  = curZ - Y_THRESH;
+  const deltaEl = document.getElementById('rdDelta');
+  if (delta >= 0) {
+    deltaEl.textContent = '⚠ ПРОБОЙ +' + delta.toFixed(2);
+    deltaEl.style.color = '#ff4444';
+  } else {
+    deltaEl.textContent = '↑ ' + (-delta).toFixed(2) + ' до порога';
+    deltaEl.style.color = `rgba(255,144,48,${0.25 + zProximity * 0.55})`;
+  }
+  document.getElementById('rdCvd').textContent = '+' + Math.round(curCvd);
+
+  // Terminal
+  updateTerminal(cycleF);
+
+  // Warning sparks along threshold line
+  if (zProximity > 0.3 && Math.random() < zProximity * 0.32) {
+    lineWarns.push({
+      x: CHART_X + rnd(0, CHART_W * 0.65),
+      life: 1, vx: rnd(1.8, 4.5)
+    });
+  }
+
+  // Decay
+  if (shakeAmt > 0) { shakeAmt *= 0.74; if (shakeAmt < 0.25) shakeAmt = 0; }
+  if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - 0.048);
+  if (bannerLife > 0 && bannerLife < 1) bannerLife = Math.min(1, bannerLife + 0.07);
+
+  // Particles
+  for (let i = parts.length-1; i >= 0; i--) {
+    const p = parts[i];
+    if (p.square) p.rot = (p.rot||0) + (p.rotV||0);
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.93; p.vy *= 0.93;
+    p.life -= 0.028;
+    if (p.life <= 0) parts.splice(i, 1);
+  }
+  for (let i = sparks.length-1; i >= 0; i--) {
+    const s = sparks[i];
+    s.x += s.vx; s.y += s.vy;
+    s.vx *= 0.90; s.vy *= 0.90;
+    s.life -= 0.042;
+    if (s.life <= 0) sparks.splice(i, 1);
+  }
+  for (let i = rings.length-1; i >= 0; i--) {
+    const rg = rings[i];
+    rg.r += (rg.maxR - rg.r) * 0.092;
+    rg.life -= 0.029;
+    if (rg.life <= 0) rings.splice(i, 1);
+  }
+  for (let i = flashes.length-1; i >= 0; i--) {
+    flashes[i].life -= 0.068;
+    if (flashes[i].life <= 0) flashes.splice(i, 1);
+  }
+  for (let i = lightnings.length-1; i >= 0; i--) {
+    lightnings[i].life -= 0.155;
+    if (lightnings[i].life <= 0) lightnings.splice(i, 1);
+  }
+  for (let i = floatNums.length-1; i >= 0; i--) {
+    const f = floatNums[i];
+    f.y += f.vy; f.vy *= 0.97;
+    f.life -= 0.022;
+    if (f.life <= 0) floatNums.splice(i, 1);
+  }
+  for (let i = lineWarns.length-1; i >= 0; i--) {
+    lineWarns[i].x    += lineWarns[i].vx;
+    lineWarns[i].life -= 0.044;
+    if (lineWarns[i].x > CHART_X + CHART_W || lineWarns[i].life <= 0) lineWarns.splice(i, 1);
+  }
+  for (const d of bgDots) {
+    d.x += d.vx; d.y += d.vy;
+    if (d.x < 0) d.x = W; if (d.x > W) d.x = 0;
+    if (d.y < 0) d.y = H; if (d.y > H) d.y = 0;
+  }
+}
+
+// ══════════════════════════
+//  DRAW — CHART
+// ══════════════════════════
+function drawChart() {
+  const curZ = zData[N_PTS - 1];
+
+  // ── Chart background ──
+  ctx.fillStyle = 'rgba(3,6,16,0.97)';
+  ctx.fillRect(CHART_X, CHART_Y, CHART_W, CHART_H);
+
+  // Threshold zone red tint (above 3.0)
+  const redA = 0.016 + zProximity * 0.072;
+  ctx.fillStyle = `rgba(255,40,40,${redA})`;
+  ctx.fillRect(CHART_X, CHART_Y, CHART_W, THRESH_Y - CHART_Y);
+
+  // Threshold warning halo (pulses as z approaches)
+  if (zProximity > 0.35) {
+    const pulse  = 0.5 + 0.5 * Math.sin(frameN * 0.2);
+    const haloA  = (zProximity - 0.35) / 0.65 * 0.10 * pulse;
+    const haloG  = ctx.createLinearGradient(0, THRESH_Y - 22, 0, THRESH_Y + 14);
+    haloG.addColorStop(0,   'rgba(255,60,60,0)');
+    haloG.addColorStop(0.5, `rgba(255,60,60,${haloA})`);
+    haloG.addColorStop(1,   'rgba(255,60,60,0)');
+    ctx.fillStyle = haloG;
+    ctx.fillRect(CHART_X, THRESH_Y - 22, CHART_W, 36);
+  }
+
+  // ── Horizontal grid lines ──
+  ctx.save();
+  ctx.beginPath(); ctx.rect(CHART_X, CHART_Y, CHART_W, CHART_H); ctx.clip();
+  for (let v = 0.5; v <= 4.0; v += 0.5) {
+    const y        = yPx(v);
+    const isThresh = Math.abs(v - Y_THRESH) < 0.01;
+    ctx.beginPath(); ctx.moveTo(CHART_X, y); ctx.lineTo(CHART_X + CHART_W, y);
+    if (isThresh) {
+      const pulse = 0.5 + 0.5 * Math.sin(frameN * 0.14);
+      ctx.strokeStyle = `rgba(255,60,60,${0.28 + zProximity*0.44 + pulse*0.12})`;
+      ctx.lineWidth   = 1.4;
+      ctx.setLineDash([8, 8]);
+    } else {
+      ctx.strokeStyle = v % 1 === 0 ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.022)';
+      ctx.lineWidth   = 0.7;
+      ctx.setLineDash([]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Subtle scanlines (CRT effect)
+  ctx.fillStyle = 'rgba(0,0,0,0.07)';
+  for (let sy = CHART_Y; sy < CHART_B; sy += 4) {
+    ctx.fillRect(CHART_X, sy, CHART_W, 1.5);
+  }
+
+  ctx.restore();
+
+  // ── Y-axis labels (outside clip) ──
+  ctx.save();
+  ctx.font = '600 9px Inter'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let v = 0; v <= 4; v++) {
+    const y = yPx(v);
+    if (y < CHART_Y - 2 || y > CHART_B + 2) continue;
+    ctx.fillStyle = v === 3
+      ? `rgba(255,80,80,${0.45 + zProximity * 0.38})`
+      : 'rgba(255,255,255,0.14)';
+    ctx.fillText(v.toFixed(0), CHART_X - 7, y);
+  }
+  ctx.restore();
+
+  // ── Re-clip for data lines ──
+  ctx.save();
+  ctx.beginPath(); ctx.rect(CHART_X - 1, CHART_Y, CHART_W + 2, CHART_H + 1); ctx.clip();
+
+  // CVD line — fill
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) {
+    const x = CHART_X + i;
+    const y = yPx(Math.min(Y_MAX - 0.08, cvdData[i]));
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.lineTo(CHART_X + N_PTS - 1, CHART_B);
+  ctx.lineTo(CHART_X, CHART_B);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(50,220,130,0.048)';
+  ctx.fill();
+
+  // CVD line — stroke
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) {
+    const x = CHART_X + i;
+    const y = yPx(Math.min(Y_MAX - 0.08, cvdData[i]));
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = 'rgba(50,220,130,0.32)';
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+
+  // Z-score line — fill (gradient)
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) {
+    const x = CHART_X + i;
+    const y = yPx(Math.min(Y_MAX - 0.08, zData[i]));
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.lineTo(CHART_X + N_PTS - 1, CHART_B);
+  ctx.lineTo(CHART_X, CHART_B);
+  ctx.closePath();
+  const zFill = ctx.createLinearGradient(0, CHART_Y, 0, CHART_B);
+  zFill.addColorStop(0, 'rgba(255,144,48,0.14)');
+  zFill.addColorStop(1, 'rgba(255,144,48,0.01)');
+  ctx.fillStyle = zFill;
+  ctx.fill();
+
+  // Z-score line — stroke
+  const zLineCol = curZ >= Y_THRESH ? '#ff3333' : '#ff9030';
+  const zGlow    = 8 + zProximity * 18 + (curZ >= Y_THRESH ? 16 : 0);
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) {
+    const x = CHART_X + i;
+    const y = yPx(Math.min(Y_MAX - 0.08, zData[i]));
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = zLineCol;
+  ctx.lineWidth   = 2.2 + zProximity * 0.7;
+  ctx.shadowColor = zLineCol;
+  ctx.shadowBlur  = zGlow;
+  ctx.stroke();
+  ctx.shadowBlur  = 0;
+
+  ctx.restore();
+
+  // ── Live end dot ──
+  const liveX = CHART_X + CHART_W - 1;
+  const liveY = yPx(Math.min(Y_MAX - 0.08, curZ));
+  ctx.beginPath(); ctx.arc(liveX, liveY, 5.5, 0, Math.PI * 2);
+  ctx.fillStyle   = zLineCol;
+  ctx.shadowColor = zLineCol; ctx.shadowBlur = 16 + zProximity * 12;
+  ctx.fill(); ctx.shadowBlur = 0;
+  ctx.beginPath(); ctx.arc(liveX, liveY, 2.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+
+  // Live value label
+  ctx.font = '700 11px Inter';
+  ctx.fillStyle   = zLineCol;
+  ctx.textAlign   = 'right'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = zLineCol; ctx.shadowBlur = 8;
+  ctx.fillText(curZ.toFixed(2), liveX - 10, liveY - 14);
+  ctx.shadowBlur  = 0;
+
+  // ── Warning sparks on threshold line ──
+  for (const lw of lineWarns) {
+    ctx.beginPath(); ctx.arc(lw.x, THRESH_Y, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle   = '#ff9030';
+    ctx.globalAlpha = lw.life * 0.75;
+    ctx.shadowColor = '#ff9030'; ctx.shadowBlur = 8;
+    ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // ── Axis / corner labels ──
+  ctx.save();
+  ctx.font = '700 9px Inter'; ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(255,144,48,0.4)'; ctx.textAlign = 'left';
+  ctx.fillText('Z-SCORE', CHART_X + 6, CHART_Y + 5);
+  ctx.fillStyle = 'rgba(50,220,130,0.3)'; ctx.textAlign = 'right';
+  ctx.fillText('CVD норм.', CHART_X + CHART_W - 6, CHART_Y + 5);
+  ctx.textBaseline = 'bottom'; ctx.textAlign = 'right';
+  ctx.fillStyle = `rgba(255,80,80,${0.4 + zProximity * 0.4})`;
+  ctx.fillText('⬡  ПОРОГ  3.0', CHART_X + CHART_W - 8, THRESH_Y - 5);
+  ctx.restore();
+
+  // ── Chart border ──
+  ctx.strokeStyle = 'rgba(255,255,255,0.065)';
+  ctx.lineWidth   = 1;
+  ctx.strokeRect(CHART_X, CHART_Y, CHART_W, CHART_H);
+
+  // X-axis tick label
+  ctx.font = '600 9px Inter'; ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText('Время →', CHART_X + 4, CHART_B + 5);
+  ctx.textAlign = 'right';
+  ctx.fillText('~14s', CHART_X + CHART_W, CHART_B + 5);
+}
+
+// ══════════════════════════
+//  DRAW — MAIN
+// ══════════════════════════
+function draw() {
+  let sx = 0, sy = 0;
+  if (shakeAmt > 0) { sx = rnd(-shakeAmt, shakeAmt); sy = rnd(-shakeAmt, shakeAmt); }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // Background
+  ctx.fillStyle = '#08090f';
+  ctx.fillRect(-30, -30, W + 60, H + 60);
+
+  // BG dots
+  for (const d of bgDots) {
+    ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+    ctx.fillStyle = d.col; ctx.globalAlpha = d.a; ctx.fill(); ctx.globalAlpha = 1;
+  }
+
+  // Ambient glow around chart (intensifies near threshold)
+  const ag = ctx.createRadialGradient(CX, CHART_Y + CHART_H * 0.5, 0, CX, CHART_Y + CHART_H * 0.5, 270);
+  ag.addColorStop(0, `rgba(255,100,40,${0.018 + zProximity * 0.06})`);
+  ag.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = ag; ctx.fillRect(0, 0, W, H);
+
+  // Chart
+  drawChart();
+
+  // ── Rings ──
+  for (const rg of rings) {
+    ctx.beginPath(); ctx.arc(rg.x, rg.y, rg.r, 0, Math.PI * 2);
+    ctx.strokeStyle = rg.col;
+    ctx.lineWidth   = rg.life * (rg.thick ? 5 : 2.5);
+    ctx.globalAlpha = rg.life * 0.72;
+    ctx.shadowColor = rg.col; ctx.shadowBlur = 16;
+    ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // ── Lightnings ──
+  for (const l of lightnings) {
+    drawLightning(l.x1, l.y1, l.x2, l.y2, l.col, l.life * 0.88, l.thick ? 2.2 : 1.4);
+  }
+
+  // ── Particles ──
+  for (const p of parts) {
+    if (p.square) {
+      ctx.save(); ctx.globalAlpha = p.life; ctx.fillStyle = p.col;
+      ctx.shadowColor = p.col; ctx.shadowBlur = 5;
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillRect(-p.r, -p.r, p.r * 2, p.r * 2);
+      ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.3, p.r * p.life), 0, Math.PI * 2);
+      ctx.fillStyle = p.col; ctx.globalAlpha = p.life;
+      ctx.shadowColor = p.col; ctx.shadowBlur = 6;
+      ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+  }
+
+  // ── Sparks ──
+  for (const s of sparks) {
+    const ex = s.x - s.vx * s.len * (0.4 + s.life * 0.6);
+    const ey = s.y - s.vy * s.len * (0.4 + s.life * 0.6);
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(ex, ey);
+    ctx.strokeStyle = s.col; ctx.lineWidth = s.life * 2.2;
+    ctx.globalAlpha = s.life * 0.85;
+    ctx.shadowColor = s.col; ctx.shadowBlur = 6;
+    ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // ── Impact flashes ──
+  for (const f of flashes) {
+    const prog = 1 - f.life;
+    ctx.beginPath(); ctx.arc(f.x, f.y, 5 + prog * 65, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,200,80,${f.life * 0.4})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(f.x, f.y, 2 + prog * 22, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,220,${f.life * 0.9})`; ctx.fill();
+  }
+
+  // ── Floating numbers ──
+  for (const f of floatNums) {
+    ctx.font = `900 ${Math.round(20 + f.life * 4)}px Inter`;
+    ctx.fillStyle = '#f5c842'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = f.life;
+    ctx.shadowColor = '#f5c842'; ctx.shadowBlur = 16;
+    ctx.fillText(f.text, f.x, f.y);
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // ── Detection banner (overlaid on chart) ──
+  if (bannerLife > 0) {
+    const pulse = 0.7 + 0.3 * Math.sin(frameN * 0.2);
+    const ba    = bannerLife;
+    const bx    = CX, by = CHART_Y + 72;
+    const bw    = 400, bh = 66;
+
+    ctx.save();
+    ctx.globalAlpha = ba;
+
+    // Backdrop
+    ctx.beginPath(); ctx.roundRect(bx - bw/2, by - bh/2, bw, bh, 11);
+    ctx.fillStyle   = 'rgba(14, 4, 4, 0.93)'; ctx.fill();
+    ctx.strokeStyle = `rgba(255,70,30,${0.6 * pulse})`; ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#ff3322'; ctx.shadowBlur = 28 * pulse * ba;
+    ctx.stroke(); ctx.shadowBlur = 0;
+
+    // Main text
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '900 22px Inter'; ctx.fillStyle = '#f5c842';
+    ctx.shadowColor = '#f5c842'; ctx.shadowBlur = 20;
+    ctx.fillText('[ICE DETECTED]', bx, by - 10);
+    ctx.shadowBlur = 0;
+
+    // Sub text
+    ctx.font = '700 12px Inter'; ctx.fillStyle = 'rgba(255,144,48,0.92)';
+    ctx.fillText(
+      'price=65230.00  cvd=+' + Math.round(detectedCvd) + '  z=' + detectedZ.toFixed(1) + '  dur=14s',
+      bx, by + 16
+    );
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  // Screen flash (no shake offset)
+  if (screenFlash > 0) {
+    if (screenFlash > 0.8) {
+      ctx.fillStyle = `rgba(255,255,255,${(screenFlash - 0.8) * 0.52})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.fillStyle = `rgba(245,200,66,${Math.min(1, screenFlash) * 0.24})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+// ── Loop ──
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+</script>
+</body>
+</html>
