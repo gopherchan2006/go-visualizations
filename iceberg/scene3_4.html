@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene 3 — Щит v4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #050608;
+  display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; font-family: 'Inter', sans-serif;
+}
+.frame {
+  width: 540px; height: 960px;
+  position: relative; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px;
+  box-shadow: 0 0 80px rgba(0,0,0,0.9);
+  background: #08090f;
+}
+canvas { position: absolute; top: 0; left: 0; width: 540px; height: 960px; z-index: 1; }
+
+.hdr {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  padding: 22px 28px 18px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  background: linear-gradient(180deg, rgba(8,9,15,0.94) 55%, transparent 100%);
+}
+.hdr-pair { font-size: 24px; font-weight: 800; color: #eef0f8; letter-spacing: 0.3px; }
+.hdr-pair em { color: rgba(238,240,248,0.3); font-style: normal; font-weight: 500; }
+.hdr-sub { font-size: 10px; font-weight: 700; color: #2a3555; letter-spacing: 1.8px; text-transform: uppercase; margin-top: 5px; }
+.hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.ice-tag {
+  padding: 4px 11px; border-radius: 7px;
+  background: rgba(245,200,66,0.1); border: 1px solid rgba(245,200,66,0.3);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #f5c842;
+  text-shadow: 0 0 8px rgba(245,200,66,0.7);
+  animation: icePulse 1.4s ease-in-out infinite;
+}
+@keyframes icePulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+.live-badge { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: #2a3555; letter-spacing: 1.5px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 8px rgba(46,204,113,0.9); animation: ldBlink 2s ease-in-out infinite; }
+@keyframes ldBlink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+.stats {
+  position: absolute; bottom: 100px; left: 0; right: 0; z-index: 3;
+  display: flex; padding: 0 20px; gap: 10px;
+}
+.s-box {
+  flex: 1; background: rgba(8,9,15,0.85); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 14px;
+  padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 4px; position: relative;
+}
+.s-box.accent { border-color: rgba(245,200,66,0.22); background: rgba(12,10,4,0.88); }
+.s-lbl { font-size: 9px; font-weight: 700; color: #1e2840; letter-spacing: 1.8px; text-transform: uppercase; }
+.s-val { font-size: 28px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+.s-val.y { color: #f5c842; text-shadow: 0 0 16px rgba(245,200,66,0.5); }
+.s-val.r { color: #ff5c5c; }
+.s-val.g { color: #32dc82; text-shadow: 0 0 12px rgba(50,220,130,0.4); }
+.s-sub { font-size: 10px; font-weight: 500; color: #252e4a; }
+.refill-pop {
+  position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: 800; color: #f5c842; letter-spacing: 0.5px;
+  white-space: nowrap; opacity: 0; pointer-events: none;
+  text-shadow: 0 0 10px rgba(245,200,66,0.9); transition: none;
+}
+.footer {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  height: 92px; padding: 16px 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(0deg, rgba(8,9,15,0.97) 60%, transparent 100%);
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.f-lbl { font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+.f-price { font-size: 28px; font-weight: 800; color: #eef0f8; letter-spacing: -0.5px; }
+.frozen-tag {
+  padding: 4px 12px; border-radius: 7px;
+  background: rgba(50,220,130,0.08); border: 1px solid rgba(50,220,130,0.2);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #32dc82;
+  animation: ldBlink 2.2s ease-in-out infinite;
+}
+.f-delta { font-size: 12px; font-weight: 600; color: #1a3530; margin-top: 5px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <canvas id="c" width="540" height="960"></canvas>
+  <div class="hdr">
+    <div>
+      <div class="hdr-pair">BTC<em>/USDT</em></div>
+      <div class="hdr-sub">Поглощение — айсберг активен</div>
+    </div>
+    <div class="hdr-right">
+      <div class="ice-tag">⬡ ICE</div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="s-box accent" style="position:relative">
+      <div class="refill-pop" id="refillPop">⬡ Восстановлен!</div>
+      <div class="s-lbl">Обновлений</div>
+      <div class="s-val y" id="sRefills">0</div>
+      <div class="s-sub">щит перезаряжен</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">Поглощено</div>
+      <div class="s-val r" id="sAbsorbed">0.0</div>
+      <div class="s-sub">BTC съедено</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">CVD Δ</div>
+      <div class="s-val g" id="sCvd">+0</div>
+      <div class="s-sub">нарастающий итог</div>
+    </div>
+  </div>
+  <div class="footer">
+    <div>
+      <div class="f-lbl">Last Price</div>
+      <div class="f-price">65,230.00</div>
+    </div>
+    <div style="text-align:right">
+      <div class="frozen-tag">FROZEN</div>
+      <div class="f-delta">Δ 0.00 USD (0.000%)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 540, H = 960;
+
+const CX  = 270, CY  = 428;
+const SR  = 118,  HAR = 152, SPR = 262;
+
+let vol        = 50;
+let refills    = 0;
+let absorbed   = 0;
+let cvd        = 0;
+let projs      = [];
+let parts      = [];   // circle particles
+let sparks     = [];   // line sparks
+let flashes    = [];   // impact flashes
+let rings      = [];   // expanding rings
+let dmgNums    = [];   // floating damage numbers
+let lightnings = [];   // lightning bolts on hit
+let bgDots     = [];   // ambient background dust
+let shakeAmt   = 0;
+let flashAlpha = 0;
+let vigAlpha   = 0;    // red vignette at crit
+let refilling  = false;
+let frameN     = 0;
+let shieldRot  = 0;    // slow rotation of outer hex ring
+
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function rndInt(a, b) { return Math.floor(rnd(a, b + 1)); }
+
+function lerpColor(h1, h2, t) {
+  t = Math.max(0, Math.min(1, t));
+  const r1=parseInt(h1.slice(1,3),16), g1=parseInt(h1.slice(3,5),16), b1=parseInt(h1.slice(5,7),16);
+  const r2=parseInt(h2.slice(1,3),16), g2=parseInt(h2.slice(3,5),16), b2=parseInt(h2.slice(5,7),16);
+  return `rgb(${Math.round(r1+(r2-r1)*t)},${Math.round(g1+(g2-g1)*t)},${Math.round(b1+(b2-b1)*t)})`;
+}
+
+function hpColor(pct) {
+  if (pct > 0.60) return lerpColor('#ff9030','#f5c842',(pct-0.60)/0.40);
+  if (pct > 0.25) return lerpColor('#ff2222','#ff9030',(pct-0.25)/0.35);
+  return '#ff2222';
+}
+
+function hexPath(x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i/6)*Math.PI*2 - Math.PI/6;
+    i===0 ? ctx.moveTo(x+Math.cos(a)*r, y+Math.sin(a)*r)
+           : ctx.lineTo(x+Math.cos(a)*r, y+Math.sin(a)*r);
+  }
+  ctx.closePath();
+}
+
+// ── Init background dust ──
+for (let i = 0; i < 55; i++) {
+  bgDots.push({
+    x: rnd(0, W), y: rnd(0, H),
+    r: rnd(0.5, 2),
+    vx: rnd(-0.12, 0.12), vy: rnd(-0.08, 0.08),
+    alpha: rnd(0.04, 0.14),
+    col: Math.random() > 0.6 ? '#f5c842' : '#4466aa'
+  });
+}
+
+// ── Lightning bolt between two points ──
+function drawLightning(x1, y1, x2, y2, col, alpha, width) {
+  const segs = 7;
+  const pts  = [{x: x1, y: y1}];
+  for (let i = 1; i < segs; i++) {
+    const t  = i / segs;
+    const mx = x1 + (x2-x1)*t + rnd(-18, 18);
+    const my = y1 + (y2-y1)*t + rnd(-18, 18);
+    pts.push({x: mx, y: my});
+  }
+  pts.push({x: x2, y: y2});
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = col;
+  ctx.lineWidth   = width;
+  ctx.shadowColor = col;
+  ctx.shadowBlur  = 12;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  // bright core
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth   = width * 0.35;
+  ctx.shadowBlur  = 4;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── Spawn projectile ──
+function spawnProj() {
+  if (refilling) return;
+  const a   = rnd(0, Math.PI*2);
+  const spd = rnd(5.0, 8.5);  // faster
+  projs.push({
+    x: CX + Math.cos(a)*SPR, y: CY + Math.sin(a)*SPR,
+    vx: -Math.cos(a)*spd, vy: -Math.sin(a)*spd,
+    vol: parseFloat(rnd(2.0, 8.0).toFixed(2)),
+    r: rnd(5, 8.5),
+    trail: []
+  });
+}
+
+// ── Hit handler ──
+function onHit(proj) {
+  if (refilling) return;
+  const bite = proj.vol;
+  vol      = Math.max(0, vol - bite);
+  absorbed += bite;
+  cvd      += bite * rnd(0.85, 1.15);
+  shakeAmt = Math.max(shakeAmt, 6 + (1 - vol/50) * 11);
+
+  const hitA = Math.atan2(proj.y-CY, proj.x-CX);
+  const ix   = CX + Math.cos(hitA)*SR;
+  const iy   = CY + Math.sin(hitA)*SR;
+
+  // impact flash
+  flashes.push({ x: ix, y: iy, life: 1, big: bite > 5 });
+
+  // circle burst particles (20)
+  for (let i = 0; i < 20; i++) {
+    const pa  = hitA + rnd(-1.1, 1.1);
+    const spd = rnd(2.0, 6.0);
+    parts.push({
+      x: ix, y: iy,
+      vx: Math.cos(pa)*spd, vy: Math.sin(pa)*spd,
+      r: rnd(2.5, 5), life: 1,
+      col: Math.random() > 0.5 ? '#ff5c5c' : (Math.random() > 0.5 ? '#ff9030' : '#ffdd55')
+    });
+  }
+
+  // line sparks (10)
+  for (let i = 0; i < 10; i++) {
+    const pa  = hitA + rnd(-0.8, 0.8);
+    const spd = rnd(4, 10);
+    sparks.push({
+      x: ix, y: iy,
+      vx: Math.cos(pa)*spd, vy: Math.sin(pa)*spd,
+      life: 1, len: rnd(6, 18),
+      col: Math.random() > 0.4 ? '#ffcc44' : '#ff6622'
+    });
+  }
+
+  // debris (square-ish chunks)
+  for (let i = 0; i < 6; i++) {
+    const pa  = hitA + rnd(-1.4, 1.4);
+    const spd = rnd(1.5, 4.5);
+    parts.push({
+      x: ix, y: iy,
+      vx: Math.cos(pa)*spd, vy: Math.sin(pa)*spd,
+      r: rnd(3, 6), life: 1,
+      col: '#b03020', square: true,
+      rot: rnd(0, Math.PI), rotV: rnd(-0.2, 0.2)
+    });
+  }
+
+  // lightning bolt from projectile origin to impact
+  lightnings.push({
+    x1: proj.x, y1: proj.y, x2: ix, y2: iy,
+    life: 1, col: '#ffaa22'
+  });
+
+  // small hit ring
+  rings.push({ r: 10, maxR: SR * 0.6 + bite * 3, life: 1, yellow: false, thin: true });
+
+  // floating damage number
+  dmgNums.push({
+    x: ix + rnd(-20, 20), y: iy,
+    text: '-' + bite.toFixed(1),
+    life: 1, vy: -1.4
+  });
+
+  updateStats();
+  if (vol <= 1.0 && !refilling) { refilling = true; setTimeout(doRefill, 140); }
+}
+
+// ── Refill ──
+function doRefill() {
+  refills++;
+  flashAlpha = 1.2;
+  shakeAmt   = 18;
+
+  // 7 expanding rings
+  for (let i = 0; i < 7; i++) {
+    setTimeout(() => {
+      rings.push({ r: SR, maxR: SPR + 80, life: 1, yellow: i%2===0, thin: false });
+    }, i * 65);
+  }
+
+  // 60 burst particles
+  for (let i = 0; i < 60; i++) {
+    const a   = (i/60)*Math.PI*2 + rnd(-0.1, 0.1);
+    const spd = rnd(2.5, 9.0);
+    parts.push({
+      x: CX+Math.cos(a)*SR, y: CY+Math.sin(a)*SR,
+      vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
+      r: rnd(2, 6), life: 1,
+      col: Math.random() > 0.35 ? '#f5c842' : (Math.random() > 0.5 ? '#ffffff' : '#ffaa44')
+    });
+  }
+
+  // 20 line sparks outward
+  for (let i = 0; i < 20; i++) {
+    const a   = (i/20)*Math.PI*2;
+    const spd = rnd(5, 14);
+    sparks.push({
+      x: CX+Math.cos(a)*SR, y: CY+Math.sin(a)*SR,
+      vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
+      life: 1, len: rnd(10, 28), col: '#f5c842'
+    });
+  }
+
+  // 6 lightning bolts radiating outward
+  for (let i = 0; i < 6; i++) {
+    const a  = (i/6)*Math.PI*2;
+    const ex = CX + Math.cos(a)*(SPR + 30);
+    const ey = CY + Math.sin(a)*(SPR + 30);
+    lightnings.push({ x1: CX, y1: CY, x2: ex, y2: ey, life: 1.2, col: '#f5c842', thick: true });
+  }
+
+  // pop label
+  const pop = document.getElementById('refillPop');
+  pop.style.transition = 'none';
+  pop.style.opacity    = '1';
+  pop.style.transform  = 'translateX(-50%) translateY(0)';
+  setTimeout(() => {
+    pop.style.transition = 'opacity 0.5s, transform 0.5s';
+    pop.style.opacity    = '0';
+    pop.style.transform  = 'translateX(-50%) translateY(-14px)';
+  }, 700);
+  setTimeout(() => {
+    pop.style.transition = 'none';
+    pop.style.transform  = 'translateX(-50%) translateY(0)';
+  }, 1300);
+
+  // animate vol back
+  const sv = vol, t0 = performance.now();
+  (function anim(t) {
+    const p = Math.min(1, (t-t0)/400);
+    vol = sv + (50-sv)*(1-(1-p)*(1-p));
+    updateStats();
+    if (p < 1) requestAnimationFrame(anim);
+    else { vol = 50; refilling = false; updateStats(); }
+  })(performance.now());
+}
+
+function updateStats() {
+  document.getElementById('sRefills').textContent  = refills;
+  document.getElementById('sAbsorbed').textContent = absorbed.toFixed(1);
+  document.getElementById('sCvd').textContent      = '+' + Math.round(cvd);
+}
+
+// ══════════════════════════
+//  UPDATE
+// ══════════════════════════
+function update() {
+  frameN++;
+  shieldRot += 0.003;
+
+  // update projectiles
+  for (let i = projs.length-1; i >= 0; i--) {
+    const p = projs[i];
+    p.trail.push({x: p.x, y: p.y});
+    if (p.trail.length > 14) p.trail.shift();
+    p.x += p.vx; p.y += p.vy;
+    const d = Math.hypot(p.x-CX, p.y-CY);
+    if (d <= SR+4) { onHit(p); projs.splice(i,1); }
+    else if (d > SPR+100) projs.splice(i,1);
+  }
+
+  // update bg dots
+  for (const d of bgDots) {
+    d.x += d.vx; d.y += d.vy;
+    if (d.x < 0) d.x = W; if (d.x > W) d.x = 0;
+    if (d.y < 0) d.y = H; if (d.y > H) d.y = 0;
+  }
+
+  // vignette at low HP
+  const pct = vol/50;
+  if (pct < 0.30) {
+    vigAlpha = Math.min(0.28, vigAlpha + 0.01);
+  } else {
+    vigAlpha = Math.max(0, vigAlpha - 0.015);
+  }
+}
+
+// ══════════════════════════
+//  DRAW
+// ══════════════════════════
+function draw() {
+  const pct       = vol / 50;
+  const col       = hpColor(pct);
+  const critPulse = pct < 0.22 ? (0.5 + 0.5*Math.sin(frameN*0.35)) : 1;
+
+  let sx = 0, sy = 0;
+  if (shakeAmt > 0) {
+    sx = rnd(-shakeAmt, shakeAmt);
+    sy = rnd(-shakeAmt, shakeAmt);
+    shakeAmt *= 0.68;
+    if (shakeAmt < 0.25) shakeAmt = 0;
+  }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // ── Background ──
+  ctx.fillStyle = '#08090f';
+  ctx.fillRect(-30, -30, W+60, H+60);
+
+  // bg dust dots
+  for (const d of bgDots) {
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.r, 0, Math.PI*2);
+    ctx.fillStyle = d.col;
+    ctx.globalAlpha = d.alpha;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ambient glow
+  const bgG = ctx.createRadialGradient(CX, CY, 0, CX, CY, SPR*1.4);
+  if (pct < 0.22) {
+    bgG.addColorStop(0, `rgba(200,20,20,${0.10*critPulse})`);
+  } else {
+    bgG.addColorStop(0, `rgba(140,100,5,${0.04+pct*0.06})`);
+  }
+  bgG.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = bgG;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Orbit track (dashed + rotating accent) ──
+  ctx.beginPath(); ctx.arc(CX, CY, SPR, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([3, 13]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Rotating orbit accents (4 arcs spinning slowly)
+  for (let i = 0; i < 4; i++) {
+    const a0 = shieldRot + (i/4)*Math.PI*2;
+    const a1 = a0 + Math.PI * 0.18;
+    ctx.beginPath(); ctx.arc(CX, CY, SPR, a0, a1);
+    ctx.strokeStyle = `rgba(245,200,66,0.18)`;
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+  }
+
+  // Orbit compass dots
+  for (let i = 0; i < 8; i++) {
+    const a = shieldRot + i*Math.PI*0.25;
+    ctx.beginPath(); ctx.arc(CX+Math.cos(a)*SPR, CY+Math.sin(a)*SPR, i%2===0 ? 3 : 1.5, 0, Math.PI*2);
+    ctx.fillStyle = i%2===0 ? 'rgba(245,200,66,0.14)' : 'rgba(255,255,255,0.06)';
+    ctx.fill();
+  }
+
+  // ── Expanding rings ──
+  for (let i = rings.length-1; i >= 0; i--) {
+    const rg = rings[i];
+    rg.r    += (rg.maxR - (rg.thin ? 10 : SR)) / (rg.thin ? 10 : 18);
+    rg.life -= rg.thin ? 0.08 : 0.042;
+    if (rg.life <= 0) { rings.splice(i,1); continue; }
+    ctx.beginPath(); ctx.arc(CX, CY, rg.r, 0, Math.PI*2);
+    ctx.strokeStyle = rg.yellow
+      ? `rgba(245,200,66,${rg.life*0.9})`
+      : `rgba(255,255,255,${rg.life*0.5})`;
+    ctx.lineWidth   = rg.thin ? rg.life*1.5 : rg.life*3;
+    ctx.shadowColor = rg.yellow ? 'rgba(245,200,66,0.6)' : 'rgba(255,255,255,0.3)';
+    ctx.shadowBlur  = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // ── HP track ──
+  ctx.beginPath(); ctx.arc(CX, CY, HAR, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 11;
+  ctx.stroke();
+
+  // ── HP arc ──
+  if (pct > 0.005) {
+    const endA = -Math.PI/2 + pct*Math.PI*2;
+    ctx.beginPath(); ctx.arc(CX, CY, HAR, -Math.PI/2, endA);
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 11;
+    ctx.lineCap     = 'round';
+    ctx.shadowColor = col;
+    ctx.shadowBlur  = pct < 0.22 ? 36*critPulse : 22;
+    ctx.stroke();
+    ctx.shadowBlur  = 0;
+    ctx.lineCap     = 'butt';
+    // end cap glow
+    const capX = CX + Math.cos(endA)*HAR;
+    const capY = CY + Math.sin(endA)*HAR;
+    ctx.beginPath(); ctx.arc(capX, capY, 7, 0, Math.PI*2);
+    ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 18; ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  // ── Shield body ──
+  ctx.beginPath(); ctx.arc(CX, CY, SR, 0, Math.PI*2);
+  const bodyG = ctx.createRadialGradient(CX, CY-SR*0.2, SR*0.1, CX, CY, SR);
+  if (pct < 0.22) {
+    bodyG.addColorStop(0, 'rgba(50,5,5,0.97)');
+    bodyG.addColorStop(1, 'rgba(12,2,2,0.99)');
+  } else {
+    bodyG.addColorStop(0, 'rgba(14,22,48,0.97)');
+    bodyG.addColorStop(1, 'rgba(4,8,18,0.99)');
+  }
+  ctx.fillStyle   = bodyG;
+  ctx.fill();
+  ctx.strokeStyle = pct < 0.22
+    ? `rgba(255,40,40,${0.18*critPulse})`
+    : 'rgba(255,255,255,0.055)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // ── Rotating hex grid inside shield ──
+  ctx.save();
+  ctx.globalAlpha = 0.05 + 0.03*(1-pct);
+  ctx.strokeStyle = '#90a8c8';
+  ctx.lineWidth   = 0.7;
+  ctx.translate(CX, CY);
+  ctx.rotate(shieldRot * 0.3);
+  ctx.translate(-CX, -CY);
+  for (let i = 0; i < 6; i++) {
+    const a = (i/6)*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(CX+Math.cos(a)*SR*0.92, CY+Math.sin(a)*SR*0.92);
+    ctx.stroke();
+  }
+  hexPath(CX, CY, SR*0.46); ctx.stroke();
+  hexPath(CX, CY, SR*0.82); ctx.stroke();
+  ctx.restore();
+
+  // ── Center text ──
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '600 11px Inter';
+  ctx.fillStyle = 'rgba(245,200,66,0.38)';
+  ctx.fillText('⬡  УРОВЕНЬ  65,230.00', CX, CY-54);
+
+  // big vol number
+  ctx.font      = '900 64px Inter';
+  ctx.fillStyle = col;
+  ctx.shadowColor = col;
+  ctx.shadowBlur  = pct < 0.22 ? 36*critPulse : 20;
+  ctx.fillText(vol.toFixed(2), CX, CY+4);
+  ctx.shadowBlur = 0;
+
+  ctx.font      = '700 18px Inter';
+  ctx.fillStyle = 'rgba(245,200,66,0.48)';
+  ctx.fillText('BTC', CX, CY+50);
+
+  // ── Lightnings ──
+  for (let i = lightnings.length-1; i >= 0; i--) {
+    const l = lightnings[i];
+    l.life -= 0.18;
+    if (l.life <= 0) { lightnings.splice(i,1); continue; }
+    drawLightning(l.x1, l.y1, l.x2, l.y2, l.col, l.life*(l.thick ? 0.9 : 0.7), l.thick ? 2.5 : 1.5);
+  }
+
+  // ── Projectiles ──
+  for (const p of projs) {
+    for (let j = 0; j < p.trail.length; j++) {
+      const ta = (j/p.trail.length)*0.5;
+      const tr = p.r*0.6*(j/p.trail.length);
+      ctx.beginPath(); ctx.arc(p.trail[j].x, p.trail[j].y, Math.max(0.3, tr), 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,70,70,${ta})`; ctx.fill();
+    }
+    // outer glow
+    const pg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r*3.5);
+    pg.addColorStop(0, 'rgba(255,80,80,0.25)'); pg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = pg;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r*3.5, 0, Math.PI*2); ctx.fill();
+    // core
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = '#ff5c5c'; ctx.shadowColor = '#ff1e1e'; ctx.shadowBlur = 20; ctx.fill();
+    ctx.shadowBlur = 0;
+    // bright center
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r*0.4, 0, Math.PI*2);
+    ctx.fillStyle = '#ffdddd'; ctx.fill();
+  }
+
+  // ── Circle Particles ──
+  for (let i = parts.length-1; i >= 0; i--) {
+    const p = parts[i];
+    if (p.square) {
+      p.rot = (p.rot||0) + (p.rotV||0);
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.90; p.vy *= 0.90;
+      p.life -= 0.03;
+      if (p.life <= 0) { parts.splice(i,1); continue; }
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle   = p.col;
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2);
+      ctx.restore();
+    } else {
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.89; p.vy *= 0.89;
+      p.life -= 0.033;
+      if (p.life <= 0) { parts.splice(i,1); continue; }
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r*p.life, 0, Math.PI*2);
+      ctx.fillStyle   = p.col;
+      ctx.globalAlpha = p.life; ctx.fill(); ctx.globalAlpha = 1;
+    }
+  }
+
+  // ── Line Sparks ──
+  for (let i = sparks.length-1; i >= 0; i--) {
+    const s = sparks[i];
+    s.x += s.vx; s.y += s.vy;
+    s.vx *= 0.87; s.vy *= 0.87;
+    s.life -= 0.055;
+    if (s.life <= 0) { sparks.splice(i,1); continue; }
+    const ex = s.x - s.vx*s.len;
+    const ey = s.y - s.vy*s.len;
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(ex, ey);
+    ctx.strokeStyle = s.col;
+    ctx.lineWidth   = s.life*2.2;
+    ctx.globalAlpha = s.life*0.85;
+    ctx.shadowColor = s.col; ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  }
+
+  // ── Impact flashes ──
+  for (let i = flashes.length-1; i >= 0; i--) {
+    const f = flashes[i];
+    f.life -= 0.09;
+    if (f.life <= 0) { flashes.splice(i,1); continue; }
+    const prog = 1 - f.life;
+    const maxR = f.big ? 42 : 28;
+    ctx.beginPath(); ctx.arc(f.x, f.y, 8+prog*maxR, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,190,90,${f.life*0.5})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(f.x, f.y, 3+prog*12, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,255,200,${f.life*0.95})`; ctx.fill();
+  }
+
+  // ── Floating damage numbers ──
+  for (let i = dmgNums.length-1; i >= 0; i--) {
+    const d = dmgNums[i];
+    d.y  += d.vy;
+    d.vy *= 0.94;
+    d.life -= 0.028;
+    if (d.life <= 0) { dmgNums.splice(i,1); continue; }
+    ctx.font      = `800 ${Math.round(12 + d.life*4)}px Inter`;
+    ctx.fillStyle = `rgba(255,100,80,${d.life})`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(255,60,40,0.7)'; ctx.shadowBlur = 8;
+    ctx.fillText(d.text + ' BTC', d.x, d.y);
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.restore();
+
+  // ── Screen flash (no shake) ──
+  if (flashAlpha > 0) {
+    if (flashAlpha > 0.8) {
+      ctx.fillStyle = `rgba(255,255,255,${(flashAlpha-0.8)*0.7})`;
+      ctx.fillRect(0,0,W,H);
+    }
+    ctx.fillStyle = `rgba(245,200,66,${Math.min(1,flashAlpha)*0.32})`;
+    ctx.fillRect(0,0,W,H);
+    flashAlpha = Math.max(0, flashAlpha-0.055);
+  }
+
+  // ── Red vignette at crit ──
+  if (vigAlpha > 0) {
+    const vg = ctx.createRadialGradient(CX, CY, SR*1.2, CX, CY, Math.max(W,H)*0.9);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, `rgba(180,10,10,${vigAlpha * (0.5+0.5*Math.sin(frameN*0.25))})`);
+    ctx.fillStyle = vg;
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
+// ── Main loop ──
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+// ── Spawn: faster — 2-3 projs every 280ms ──
+setInterval(() => {
+  if (refilling) return;
+  spawnProj();
+  if (Math.random() > 0.4) spawnProj();
+  if (Math.random() > 0.75) spawnProj();
+}, 280);
+
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+</script>
+</body>
+</html>
