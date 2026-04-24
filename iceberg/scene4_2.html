@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene 4 — Ливень</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #050608;
+  display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; font-family: 'Inter', sans-serif;
+}
+.frame {
+  width: 540px; height: 960px;
+  position: relative; overflow: hidden;
+  background: #08090f;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px;
+  box-shadow: 0 0 80px rgba(0,0,0,0.9);
+}
+canvas { position: absolute; top: 0; left: 0; width: 540px; height: 960px; z-index: 1; }
+
+/* Header */
+.hdr {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  padding: 22px 28px 18px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  background: linear-gradient(180deg, rgba(8,9,15,0.97) 60%, transparent 100%);
+}
+.hdr-pair { font-size: 24px; font-weight: 800; color: #eef0f8; letter-spacing: 0.3px; }
+.hdr-pair em { color: rgba(238,240,248,0.28); font-style: normal; font-weight: 500; }
+.hdr-sub { font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.8px; text-transform: uppercase; margin-top: 5px; }
+.hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.ice-tag {
+  padding: 4px 11px; border-radius: 7px;
+  background: rgba(245,200,66,0.1); border: 1px solid rgba(245,200,66,0.28);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #f5c842;
+  text-shadow: 0 0 8px rgba(245,200,66,0.7);
+  animation: icePulse 1.4s ease-in-out infinite;
+}
+@keyframes icePulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+.live-badge { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.5px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 8px rgba(46,204,113,0.9); animation: ldBlink 2s ease-in-out infinite; }
+@keyframes ldBlink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* Counter band */
+.cnt-band {
+  position: absolute; top: 108px; left: 0; right: 0; z-index: 3;
+  height: 60px; padding: 0 24px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(8,9,15,0.93);
+  border-top: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(245,200,66,0.08);
+}
+.cnt-main { display: flex; flex-direction: column; }
+.cnt-num {
+  font-size: 36px; font-weight: 900; color: #f5c842; line-height: 1;
+  letter-spacing: -1.5px; text-shadow: 0 0 20px rgba(245,200,66,0.5);
+}
+.cnt-sub { font-size: 9px; font-weight: 700; color: rgba(245,200,66,0.28); letter-spacing: 2px; text-transform: uppercase; margin-top: 3px; }
+.cvd-main { display: flex; flex-direction: column; align-items: flex-end; }
+.cvd-num {
+  font-size: 26px; font-weight: 800; color: #32dc82; line-height: 1;
+  letter-spacing: -0.5px; text-shadow: 0 0 14px rgba(50,220,130,0.4);
+}
+.cvd-sub { font-size: 9px; font-weight: 700; color: rgba(50,220,130,0.28); letter-spacing: 2px; text-transform: uppercase; margin-top: 3px; }
+
+/* Stats */
+.stats {
+  position: absolute; bottom: 92px; left: 0; right: 0; z-index: 3;
+  display: flex; padding: 0 16px; gap: 8px;
+}
+.s-box {
+  flex: 1; background: rgba(8,9,15,0.88); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.055); border-radius: 14px;
+  padding: 14px 12px 12px; display: flex; flex-direction: column; gap: 3px;
+}
+.s-box.accent { border-color: rgba(245,200,66,0.2); }
+.s-lbl { font-size: 9px; font-weight: 700; color: #1a2235; letter-spacing: 1.8px; text-transform: uppercase; }
+.s-val { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+.s-val.y { color: #f5c842; text-shadow: 0 0 12px rgba(245,200,66,0.35); }
+.s-val.g { color: #32dc82; text-shadow: 0 0 10px rgba(50,220,130,0.3); }
+.s-val.r { color: #ff5c5c; text-shadow: 0 0 10px rgba(255,92,92,0.3); }
+.s-val.w { color: #eef0f8; }
+.s-sub { font-size: 10px; font-weight: 500; color: #1a2235; }
+
+/* Footer */
+.footer {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  height: 90px; padding: 16px 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(0deg, rgba(8,9,15,0.98) 65%, transparent 100%);
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.f-lbl { font-size: 10px; font-weight: 700; color: #1a2235; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+.f-price { font-size: 28px; font-weight: 800; color: #eef0f8; letter-spacing: -0.5px; }
+.frozen-tag {
+  padding: 4px 12px; border-radius: 7px;
+  background: rgba(50,220,130,0.08); border: 1px solid rgba(50,220,130,0.2);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #32dc82;
+  animation: ldBlink 2.2s ease-in-out infinite;
+}
+.f-delta { font-size: 12px; font-weight: 600; color: #172a22; margin-top: 5px; text-align: right; }
+
+/* Whale popup */
+.whale-pop {
+  position: absolute; z-index: 5;
+  top: 174px; right: 16px;
+  padding: 6px 14px 6px 10px; border-radius: 9px;
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+  opacity: 0; transform: translateX(18px);
+  transition: opacity 0.1s ease, transform 0.12s ease;
+  pointer-events: none; white-space: nowrap;
+}
+.whale-pop.buy  { background: rgba(50,220,130,0.12); border: 1px solid rgba(50,220,130,0.38); color: #32dc82; }
+.whale-pop.sell { background: rgba(255,92,92,0.12);  border: 1px solid rgba(255,92,92,0.38);  color: #ff5c5c; }
+.whale-pop.visible { opacity: 1; transform: translateX(0); }
+</style>
+</head>
+<body>
+<div class="frame">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <div class="hdr">
+    <div>
+      <div class="hdr-pair">BTC<em>/USDT</em></div>
+      <div class="hdr-sub">Шквал принтов — уровень держится</div>
+    </div>
+    <div class="hdr-right">
+      <div class="ice-tag">⬡ ICE</div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>
+  </div>
+
+  <div class="cnt-band">
+    <div class="cnt-main">
+      <div class="cnt-num" id="cntNum">×0</div>
+      <div class="cnt-sub">сделок на уровне</div>
+    </div>
+    <div class="cvd-main">
+      <div class="cvd-num" id="cvdNum">+0.0</div>
+      <div class="cvd-sub">CVD BTC</div>
+    </div>
+  </div>
+
+  <div class="whale-pop" id="whalePop">
+    <span id="whaleIcon">▲</span><span id="whaleText">КИТ</span>
+  </div>
+
+  <div class="stats">
+    <div class="s-box accent">
+      <div class="s-lbl">Принтов</div>
+      <div class="s-val y" id="sCnt">0</div>
+      <div class="s-sub">по одной цене</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">Объём</div>
+      <div class="s-val w" id="sVol">0.0</div>
+      <div class="s-sub">BTC поглощено</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">CVD Δ</div>
+      <div class="s-val g" id="sCvd">+0</div>
+      <div class="s-sub">нарастающий</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <div class="f-lbl">Last Price</div>
+      <div class="f-price">65,230.00</div>
+    </div>
+    <div style="text-align:right">
+      <div class="frozen-tag">FROZEN</div>
+      <div class="f-delta">Δ 0.00 USD (0.000%)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 540, H = 960;
+const PRICE_Y  = 700;   // golden price line
+const SPAWN_Y  = 168;   // just below counter band
+
+function rnd(a, b) { return a + Math.random() * (b - a); }
+
+let meteors    = [];
+let parts      = [];   // circle & square chunks
+let sparks     = [];   // line sparks
+let rings      = [];   // expanding circles
+let flashes    = [];   // impact point flash
+let lightnings = [];   // lightning bolts
+let floatNums  = [];   // "+1.2 BTC" floating numbers
+let bgDots     = [];   // ambient background dust
+
+let heatMap = new Float32Array(54);  // per 10px segment across 540px
+let lineHeat  = 0;                   // global heat 0–1
+
+let counter = 0, cvd = 0, totalVol = 0, frameN = 0;
+let screenFlash = 0, milestoneFlash = 0, whaleTimer = 0;
+let shakeAmt = 0;
+
+// Ambient background dust (drifts down slowly like falling embers)
+for (let i = 0; i < 55; i++) {
+  bgDots.push({
+    x: rnd(0, W),
+    y: rnd(SPAWN_Y, PRICE_Y),
+    vx: rnd(-0.08, 0.08),
+    vy: rnd(0.06, 0.22),
+    r:  rnd(0.4, 1.6),
+    a:  rnd(0.03, 0.1),
+    col: Math.random() > 0.55 ? '#32dc82' : (Math.random() > 0.5 ? '#f5c842' : '#4466bb')
+  });
+}
+
+// ── Lightning ──
+function drawLightning(x1, y1, x2, y2, col, alpha, w) {
+  const segs = 6;
+  const pts  = [{x: x1, y: y1}];
+  for (let i = 1; i < segs; i++) {
+    const t = i / segs;
+    pts.push({ x: x1+(x2-x1)*t + rnd(-18,18), y: y1+(y2-y1)*t + rnd(-16,16) });
+  }
+  pts.push({x: x2, y: y2});
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, alpha);
+  ctx.strokeStyle = col; ctx.lineWidth = w;
+  ctx.shadowColor = col; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = w * 0.28; ctx.shadowBlur = 4;
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── Spawn meteor ──
+function spawnMeteor() {
+  const buy = Math.random() < 0.56;
+  let sz;
+  const r = Math.random();
+  if      (r > 0.94) sz = rnd(3.5, 9.5);    // whale  6%
+  else if (r > 0.82) sz = rnd(1.2, 3.5);    // large 12%
+  else if (r > 0.58) sz = rnd(0.25, 1.2);   // medium 24%
+  else               sz = rnd(0.008, 0.25);  // small 58%
+  sz = parseFloat(sz.toFixed(3));
+
+  const whale = sz >= 3.5;
+  const big   = sz >= 1.2;
+
+  let mr;
+  if      (whale)    mr = rnd(18, 26);
+  else if (big)      mr = rnd(11, 18);
+  else if (sz>0.25)  mr = rnd(7, 11);
+  else               mr = rnd(3.5, 7);
+
+  const spd = whale ? rnd(4, 7) : (big ? rnd(5, 8.5) : rnd(4, 7.5));
+
+  meteors.push({
+    x:     rnd(mr + 16, W - mr - 16),
+    y:     SPAWN_Y - rnd(0, 60),        // staggered initial heights
+    vy:    spd,
+    r:     mr,
+    vol:   sz, buy, whale, big,
+    trail: [],
+    alpha: 0
+  });
+}
+
+// ── Impact handler ──
+function onImpact(m) {
+  const col  = m.buy ? '#32dc82' : '#ff5c5c';
+  const colD = m.buy ? 'rgba(50,220,130,' : 'rgba(255,92,92,';
+
+  cvd      += m.vol * (m.buy ? 1 : -1);
+  totalVol += m.vol;
+  counter++;
+
+  shakeAmt = Math.max(shakeAmt, m.whale ? 10 : (m.big ? 5 : 2));
+
+  // Heat map update
+  const seg = Math.min(53, Math.max(0, Math.floor(m.x / 10)));
+  heatMap[seg] = Math.min(1, heatMap[seg] + 0.5 + m.vol * 0.055);
+  if (seg > 0)  heatMap[seg-1] = Math.min(1, heatMap[seg-1] + 0.2);
+  if (seg < 53) heatMap[seg+1] = Math.min(1, heatMap[seg+1] + 0.2);
+  lineHeat = Math.min(1, lineHeat + 0.055 + m.vol * 0.014);
+
+  // Flash
+  flashes.push({ x: m.x, y: PRICE_Y, life: 1, big: m.big || m.whale });
+
+  // Circle particles — spray upward + sideways
+  const nP = m.whale ? 46 : (m.big ? 28 : 15);
+  for (let i = 0; i < nP; i++) {
+    const a   = rnd(-Math.PI, 0.18);   // mostly upper hemisphere
+    const spd = rnd(1.5, m.whale ? 11 : (m.big ? 7.5 : 5.5));
+    parts.push({
+      x: m.x, y: PRICE_Y,
+      vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
+      r: rnd(2, m.whale ? 7 : (m.big ? 5.5 : 4)),
+      life: 1,
+      col: Math.random() > 0.42 ? col : (Math.random() > 0.5 ? '#ffffff' : '#f5c842')
+    });
+  }
+
+  // Line sparks
+  const nS = m.whale ? 26 : (m.big ? 16 : 9);
+  for (let i = 0; i < nS; i++) {
+    const a   = rnd(-Math.PI, 0.22);
+    const spd = rnd(5, m.whale ? 17 : (m.big ? 12 : 8.5));
+    sparks.push({
+      x: m.x, y: PRICE_Y,
+      vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
+      life: 1, len: rnd(8, m.whale ? 30 : 20),
+      col: Math.random() > 0.5 ? col : '#f5c842'
+    });
+  }
+
+  // Primary ring
+  rings.push({ x: m.x, r: m.r, maxR: m.whale ? 210 : (m.big ? 125 : 68), life: 1, col, whale: m.whale });
+
+  // Floating number
+  floatNums.push({
+    x: m.x + rnd(-18,18), y: PRICE_Y - m.r - 2,
+    text: (m.buy ? '+' : '-') + m.vol.toFixed(2),
+    life: 1, vy: -1.8, col
+  });
+
+  if (m.whale) {
+    screenFlash = 1.3;
+    // Extra rings delayed
+    for (let i = 1; i <= 3; i++) {
+      setTimeout(() => {
+        rings.push({ x: m.x, r: m.r + i*14, maxR: 250 + i*45, life: 1, col: '#f5c842', whale: true });
+      }, i * 80);
+    }
+    // Debris chunks
+    for (let i = 0; i < 12; i++) {
+      const a = rnd(0, Math.PI*2);
+      parts.push({
+        x: m.x, y: PRICE_Y,
+        vx: Math.cos(a)*rnd(2.5,8), vy: Math.sin(a)*rnd(2,6),
+        r: rnd(4,9), life: 1,
+        col: '#ff8822', square: true, rot: rnd(0,Math.PI), rotV: rnd(-0.3,0.3)
+      });
+    }
+    // Lightning bolts radiating from impact
+    for (let i = 0; i < 6; i++) {
+      const a   = rnd(0, Math.PI*2);
+      const dx  = Math.cos(a) * rnd(70, 200);
+      const dy  = Math.sin(a) * rnd(40, 110) * (Math.sin(a) < 0 ? 1 : 0.4);
+      lightnings.push({
+        x1: m.x, y1: PRICE_Y,
+        x2: Math.max(10, Math.min(W-10, m.x + dx)),
+        y2: Math.max(SPAWN_Y+10, Math.min(PRICE_Y+60, PRICE_Y + dy)),
+        life: 1.2, col: '#f5c842', thick: true
+      });
+    }
+    // Whale popup
+    const pop = document.getElementById('whalePop');
+    pop.className = 'whale-pop ' + (m.buy ? 'buy' : 'sell');
+    document.getElementById('whaleIcon').textContent = m.buy ? '▲' : '▼';
+    document.getElementById('whaleText').textContent = m.vol.toFixed(2) + ' BTC — КИТ!';
+    pop.classList.add('visible');
+    whaleTimer = 105;
+  }
+
+  if (counter % 50 === 0) milestoneFlash = 1.0;
+  updateStats();
+}
+
+function updateStats() {
+  document.getElementById('cntNum').textContent = '×' + counter;
+  document.getElementById('cvdNum').textContent = (cvd >= 0 ? '+' : '') + cvd.toFixed(1);
+  document.getElementById('sCnt').textContent   = counter;
+  document.getElementById('sVol').textContent   = totalVol.toFixed(1);
+  document.getElementById('sCvd').textContent   = (cvd >= 0 ? '+' : '') + Math.round(cvd);
+
+  const el = document.getElementById('sCvd');
+  el.className = 's-val ' + (cvd >= 0 ? 'g' : 'r');
+
+  const cvdEl = document.getElementById('cvdNum');
+  if (cvd >= 0) {
+    cvdEl.style.color      = '#32dc82';
+    cvdEl.style.textShadow = '0 0 14px rgba(50,220,130,0.4)';
+  } else {
+    cvdEl.style.color      = '#ff5c5c';
+    cvdEl.style.textShadow = '0 0 14px rgba(255,92,92,0.4)';
+  }
+
+  const glow = milestoneFlash > 0
+    ? `0 0 ${32*milestoneFlash}px rgba(245,200,66,${milestoneFlash*0.9})`
+    : '0 0 20px rgba(245,200,66,0.5)';
+  document.getElementById('cntNum').style.textShadow = glow;
+}
+
+// ══════════════════════════
+//  UPDATE
+// ══════════════════════════
+function update() {
+  frameN++;
+
+  // Decay
+  lineHeat = Math.max(0, lineHeat - 0.007);
+  for (let i = 0; i < 54; i++) heatMap[i] = Math.max(0, heatMap[i] - 0.011);
+  if (milestoneFlash > 0) milestoneFlash = Math.max(0, milestoneFlash - 0.02);
+  if (screenFlash    > 0) screenFlash    = Math.max(0, screenFlash    - 0.052);
+  if (shakeAmt       > 0) { shakeAmt *= 0.72; if (shakeAmt < 0.3) shakeAmt = 0; }
+  if (whaleTimer     > 0) { whaleTimer--; if (whaleTimer === 0) document.getElementById('whalePop').classList.remove('visible'); }
+
+  // Meteors
+  for (let i = meteors.length-1; i >= 0; i--) {
+    const m = meteors[i];
+    m.trail.push({x: m.x, y: m.y});
+    if (m.trail.length > 22) m.trail.shift();
+    m.y    += m.vy;
+    m.alpha = Math.min(1, m.alpha + 0.14);
+    if (m.y + m.r >= PRICE_Y) { onImpact(m); meteors.splice(i,1); }
+    else if (m.y - m.r > H)   meteors.splice(i,1);
+  }
+
+  // Particles (gravity-affected)
+  for (let i = parts.length-1; i >= 0; i--) {
+    const p = parts[i];
+    if (p.square) p.rot = (p.rot||0) + (p.rotV||0);
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.14; p.vx *= 0.96; p.vy *= 0.96;
+    p.life -= 0.027;
+    if (p.life <= 0) parts.splice(i,1);
+  }
+
+  // Sparks (gravity-affected)
+  for (let i = sparks.length-1; i >= 0; i--) {
+    const s = sparks[i];
+    s.x += s.vx; s.y += s.vy;
+    s.vy += 0.2; s.vx *= 0.88; s.vy *= 0.88;
+    s.life -= 0.048;
+    if (s.life <= 0) sparks.splice(i,1);
+  }
+
+  // Rings
+  for (let i = rings.length-1; i >= 0; i--) {
+    const rg = rings[i];
+    rg.r += (rg.maxR - rg.r) * 0.1;
+    rg.life -= 0.031;
+    if (rg.life <= 0) rings.splice(i,1);
+  }
+
+  // Flashes
+  for (let i = flashes.length-1; i >= 0; i--) {
+    flashes[i].life -= 0.075;
+    if (flashes[i].life <= 0) flashes.splice(i,1);
+  }
+
+  // Lightnings
+  for (let i = lightnings.length-1; i >= 0; i--) {
+    lightnings[i].life -= 0.16;
+    if (lightnings[i].life <= 0) lightnings.splice(i,1);
+  }
+
+  // Float numbers
+  for (let i = floatNums.length-1; i >= 0; i--) {
+    const f = floatNums[i];
+    f.y += f.vy; f.vy *= 0.96;
+    f.life -= 0.024;
+    if (f.life <= 0) floatNums.splice(i,1);
+  }
+
+  // BG dust
+  for (const d of bgDots) {
+    d.x += d.vx; d.y += d.vy;
+    if (d.y > PRICE_Y + 10) { d.y = SPAWN_Y - rnd(0,50); d.x = rnd(0,W); }
+    if (d.x < 0) d.x = W; if (d.x > W) d.x = 0;
+  }
+}
+
+// ══════════════════════════
+//  DRAW helpers
+// ══════════════════════════
+function drawPriceLine() {
+  // Under-glow
+  const h  = 0.12 + lineHeat * 0.55;
+  const bg = ctx.createRadialGradient(W/2, PRICE_Y, 0, W/2, PRICE_Y, 310);
+  bg.addColorStop(0, `rgba(245,200,66,${h * 0.14})`);
+  bg.addColorStop(0.55, `rgba(245,200,66,${h * 0.05})`);
+  bg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, PRICE_Y-90, W, 180);
+
+  // Per-segment heat
+  for (let i = 0; i < 54; i++) {
+    if (heatMap[i] < 0.02) continue;
+    const hv = heatMap[i];
+    const x  = i * 10 + 5;
+    const sg = ctx.createRadialGradient(x, PRICE_Y, 0, x, PRICE_Y, 26 + hv*24);
+    sg.addColorStop(0, `rgba(255,200,80,${hv*0.6})`);
+    sg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(x-32, PRICE_Y-32, 64, 64);
+  }
+
+  // Main line
+  ctx.beginPath(); ctx.moveTo(0, PRICE_Y); ctx.lineTo(W, PRICE_Y);
+  ctx.strokeStyle = '#f5c842';
+  ctx.lineWidth   = 2.5;
+  ctx.shadowColor = '#f5c842';
+  ctx.shadowBlur  = 12 + lineHeat * 30;
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  // Lower shimmer dash
+  ctx.beginPath(); ctx.moveTo(0, PRICE_Y+4); ctx.lineTo(W, PRICE_Y+4);
+  ctx.strokeStyle = 'rgba(245,200,66,0.1)';
+  ctx.lineWidth   = 1.5;
+  ctx.setLineDash([6, 14]);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Left label
+  ctx.font = '700 9px Inter';
+  ctx.fillStyle = 'rgba(245,200,66,0.32)';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+  ctx.fillText('⬡  АЙСБЕРГ — УРОВЕНЬ ДЕРЖИТСЯ', 14, PRICE_Y - 8);
+
+  // Right price
+  ctx.font = '800 14px Inter';
+  ctx.fillStyle = '#f5c842';
+  ctx.shadowColor = '#f5c842'; ctx.shadowBlur = 12;
+  ctx.textAlign = 'right';
+  ctx.fillText('65,230.00', W - 14, PRICE_Y - 8);
+  ctx.shadowBlur = 0;
+}
+
+function drawCvdBar() {
+  const bx = W - 9, bw = 5;
+  const bT = SPAWN_Y + 8, bB = PRICE_Y - 8;
+  const bH = bB - bT;
+
+  // Track
+  ctx.beginPath(); ctx.roundRect(bx, bT, bw, bH, 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fill();
+
+  // Fill
+  const pct = Math.min(1, Math.abs(cvd) / 500);
+  const fH  = bH * pct;
+  if (fH > 2) {
+    const fc = cvd >= 0 ? '#32dc82' : '#ff5c5c';
+    const fy = cvd >= 0 ? bB - fH : bT;
+    const fg = ctx.createLinearGradient(0, fy, 0, fy+fH);
+    fg.addColorStop(0, fc + '40'); fg.addColorStop(1, fc + 'cc');
+    ctx.beginPath(); ctx.roundRect(bx, fy, bw, fH, 2);
+    ctx.fillStyle   = fg;
+    ctx.shadowColor = fc; ctx.shadowBlur = 8;
+    ctx.fill(); ctx.shadowBlur = 0;
+  }
+}
+
+// ══════════════════════════
+//  DRAW
+// ══════════════════════════
+function draw() {
+  let sx = 0, sy = 0;
+  if (shakeAmt > 0) {
+    sx = rnd(-shakeAmt, shakeAmt);
+    sy = rnd(-shakeAmt, shakeAmt);
+  }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // Background
+  ctx.fillStyle = '#08090f';
+  ctx.fillRect(-30,-30, W+60, H+60);
+
+  // Ambient bg glow (green tint in field zone)
+  const ag = ctx.createRadialGradient(W/2, (SPAWN_Y+PRICE_Y)/2, 0, W/2, (SPAWN_Y+PRICE_Y)/2, 290);
+  ag.addColorStop(0, 'rgba(50,220,130,0.022)');
+  ag.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = ag; ctx.fillRect(0, 0, W, H);
+
+  // BG dust
+  for (const d of bgDots) {
+    ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2);
+    ctx.fillStyle = d.col; ctx.globalAlpha = d.a; ctx.fill(); ctx.globalAlpha = 1;
+  }
+
+  // ── Big faint counter watermark in field ──
+  const midY = (SPAWN_Y + PRICE_Y) / 2;
+  ctx.save();
+  ctx.globalAlpha = 0.025 + milestoneFlash * 0.05;
+  ctx.font = '900 120px Inter';
+  ctx.fillStyle = '#f5c842';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('×' + counter, W/2, midY - 12);
+  ctx.font = '800 22px Inter';
+  ctx.fillText('СДЕЛОК НА УРОВНЕ', W/2, midY + 78);
+  ctx.restore();
+
+  // ── Rings (behind meteors) ──
+  for (const rg of rings) {
+    ctx.beginPath(); ctx.arc(rg.x, PRICE_Y, rg.r, 0, Math.PI*2);
+    ctx.strokeStyle = rg.col;
+    ctx.lineWidth   = rg.life * (rg.whale ? 4.5 : 2.5);
+    ctx.globalAlpha = rg.life * 0.7;
+    ctx.shadowColor = rg.col; ctx.shadowBlur = 14;
+    ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // ── Price line ──
+  drawPriceLine();
+
+  // ── CVD bar ──
+  drawCvdBar();
+
+  // ── Lightnings ──
+  for (const l of lightnings) {
+    drawLightning(l.x1, l.y1, l.x2, l.y2, l.col, l.life * 0.85, l.thick ? 2.2 : 1.4);
+  }
+
+  // ── Particles ──
+  for (const p of parts) {
+    if (p.square) {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle   = p.col;
+      ctx.shadowColor = p.col; ctx.shadowBlur = 5;
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2);
+      ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.3, p.r * p.life), 0, Math.PI*2);
+      ctx.fillStyle = p.col;
+      ctx.globalAlpha = p.life;
+      ctx.shadowColor = p.col; ctx.shadowBlur = 5;
+      ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+  }
+
+  // ── Sparks ──
+  for (const s of sparks) {
+    const ex = s.x - s.vx * s.len * (0.5 + s.life * 0.5);
+    const ey = s.y - s.vy * s.len * (0.5 + s.life * 0.5);
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(ex, ey);
+    ctx.strokeStyle = s.col;
+    ctx.lineWidth   = s.life * 2.2;
+    ctx.globalAlpha = s.life * 0.85;
+    ctx.shadowColor = s.col; ctx.shadowBlur = 6;
+    ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // ── Impact flashes ──
+  for (const f of flashes) {
+    const prog = 1 - f.life;
+    const mr   = f.big ? 55 : 34;
+    ctx.beginPath(); ctx.arc(f.x, f.y, 6 + prog*mr, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,200,80,${f.life*0.42})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(f.x, f.y, 2 + prog*16, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,255,210,${f.life*0.9})`; ctx.fill();
+  }
+
+  // ── Meteors ──
+  for (const m of meteors) {
+    const col  = m.buy ? '#32dc82' : '#ff5c5c';
+    const colD = m.buy ? 'rgba(50,220,130,' : 'rgba(255,92,92,';
+
+    // Comet trail
+    for (let j = 0; j < m.trail.length; j++) {
+      const t  = j / m.trail.length;
+      const tr = m.r * 0.7 * t;
+      if (tr < 0.3) continue;
+      ctx.beginPath(); ctx.arc(m.trail[j].x, m.trail[j].y, tr, 0, Math.PI*2);
+      ctx.fillStyle   = colD + (t * 0.6 * m.alpha) + ')';
+      ctx.fill();
+    }
+
+    // Outer glow halo
+    const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r*4.2);
+    g.addColorStop(0, colD + '0.28)'); g.addColorStop(1, colD + '0)');
+    ctx.globalAlpha = m.alpha;
+    ctx.fillStyle   = g;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r*4.2, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Core sphere
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI*2);
+    ctx.fillStyle   = col;
+    ctx.shadowColor = col; ctx.shadowBlur = 18 + m.r;
+    ctx.globalAlpha = m.alpha;
+    ctx.fill(); ctx.shadowBlur = 0;
+
+    // Bright inner core
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r*0.38, 0, Math.PI*2);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Volume label for notable trades
+    if (m.big || m.whale) {
+      ctx.font      = m.whale ? '800 11px Inter' : '700 10px Inter';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha  = m.alpha * 0.8;
+      ctx.fillText(m.vol.toFixed(1), m.x, m.y - m.r - 11);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ── Floating numbers ──
+  for (const f of floatNums) {
+    ctx.font      = `800 ${Math.round(11 + f.life*3)}px Inter`;
+    ctx.fillStyle = f.col;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha  = f.life;
+    ctx.shadowColor  = f.col; ctx.shadowBlur = 8;
+    ctx.fillText(f.text + ' BTC', f.x, f.y);
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+
+  // ── Screen flash (no shake) ──
+  if (screenFlash > 0) {
+    if (screenFlash > 0.8) {
+      ctx.fillStyle = `rgba(255,255,255,${(screenFlash-0.8)*0.6})`;
+      ctx.fillRect(0,0,W,H);
+    }
+    ctx.fillStyle = `rgba(245,200,66,${Math.min(1,screenFlash)*0.28})`;
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
+// ── Loop ──
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+// ── Spawn: ~70ms base, occasional multi-meteor bursts ──
+setInterval(() => {
+  spawnMeteor();
+  if (Math.random() > 0.52) setTimeout(spawnMeteor, rnd(14, 48));
+  if (Math.random() > 0.76) setTimeout(spawnMeteor, rnd(48, 105));
+}, 70);
+
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+</script>
+</body>
+</html>
