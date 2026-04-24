@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene 3 — Щит</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #050608;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+}
+
+.frame {
+  width: 540px;
+  height: 960px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px;
+  box-shadow: 0 0 80px rgba(0,0,0,0.9);
+  background: #08090f;
+}
+
+canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 540px; height: 960px;
+  z-index: 1;
+}
+
+/* ── Header ── */
+.hdr {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 3;
+  padding: 22px 28px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: linear-gradient(180deg, rgba(8,9,15,0.92) 60%, transparent 100%);
+}
+.hdr-pair { font-size: 24px; font-weight: 800; color: #eef0f8; letter-spacing: 0.3px; }
+.hdr-pair em { color: rgba(238,240,248,0.3); font-style: normal; font-weight: 500; }
+.hdr-sub { font-size: 10px; font-weight: 700; color: #2a3555; letter-spacing: 1.8px; text-transform: uppercase; margin-top: 5px; }
+.hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+
+.ice-tag {
+  padding: 4px 11px;
+  background: rgba(245,200,66,0.1);
+  border: 1px solid rgba(245,200,66,0.3);
+  border-radius: 7px;
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px;
+  color: #f5c842;
+  text-shadow: 0 0 8px rgba(245,200,66,0.7);
+  animation: icePulse 1.4s ease-in-out infinite;
+}
+@keyframes icePulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+.live-badge {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 700; color: #2a3555; letter-spacing: 1.5px;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 8px rgba(46,204,113,0.9);
+  animation: ldBlink 2s ease-in-out infinite;
+}
+@keyframes ldBlink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* ── Stats ── */
+.stats {
+  position: absolute;
+  bottom: 100px; left: 0; right: 0;
+  z-index: 3;
+  display: flex;
+  padding: 0 20px;
+  gap: 10px;
+}
+.s-box {
+  flex: 1;
+  background: rgba(8,9,15,0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  position: relative;
+}
+.s-box.accent { border-color: rgba(245,200,66,0.18); background: rgba(12,10,4,0.85); }
+.s-lbl { font-size: 9px; font-weight: 700; color: #1e2840; letter-spacing: 1.8px; text-transform: uppercase; }
+.s-val { font-size: 28px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+.s-val.y { color: #f5c842; text-shadow: 0 0 16px rgba(245,200,66,0.5); }
+.s-val.r { color: #ff5c5c; }
+.s-val.g { color: #32dc82; text-shadow: 0 0 12px rgba(50,220,130,0.4); }
+.s-sub { font-size: 10px; font-weight: 500; color: #252e4a; }
+
+/* Refill pop text */
+.refill-pop {
+  position: absolute;
+  top: -22px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: 800;
+  color: #f5c842; letter-spacing: 0.5px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  text-shadow: 0 0 10px rgba(245,200,66,0.9);
+  transition: none;
+}
+
+/* ── Footer ── */
+.footer {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 3;
+  height: 92px;
+  padding: 16px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(0deg, rgba(8,9,15,0.95) 60%, transparent 100%);
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.f-lbl { font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+.f-price { font-size: 28px; font-weight: 800; color: #eef0f8; letter-spacing: -0.5px; }
+.frozen-tag {
+  padding: 4px 12px; border-radius: 7px;
+  background: rgba(50,220,130,0.08);
+  border: 1px solid rgba(50,220,130,0.2);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px;
+  color: #32dc82;
+  animation: ldBlink 2.2s ease-in-out infinite;
+}
+.f-delta { font-size: 12px; font-weight: 600; color: #1a3530; margin-top: 5px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <!-- Header -->
+  <div class="hdr">
+    <div>
+      <div class="hdr-pair">BTC<em>/USDT</em></div>
+      <div class="hdr-sub">Поглощение — айсберг активен</div>
+    </div>
+    <div class="hdr-right">
+      <div class="ice-tag">⬡ ICE</div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="s-box accent" style="position:relative">
+      <div class="refill-pop" id="refillPop">⬡ Восстановлен!</div>
+      <div class="s-lbl">Обновлений</div>
+      <div class="s-val y" id="sRefills">0</div>
+      <div class="s-sub">щит перезаряжен</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">Поглощено</div>
+      <div class="s-val r" id="sAbsorbed">0.0</div>
+      <div class="s-sub">BTC съедено</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">CVD Δ</div>
+      <div class="s-val g" id="sCvd">+0</div>
+      <div class="s-sub">нарастающий итог</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>
+      <div class="f-lbl">Last Price</div>
+      <div class="f-price">65,230.00</div>
+    </div>
+    <div style="text-align:right">
+      <div class="frozen-tag">FROZEN</div>
+      <div class="f-delta">Δ 0.00 USD (0.000%)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 540, H = 960;
+
+// Shield geometry
+const CX  = 270;   // center x
+const CY  = 428;   // center y
+const SR  = 116;   // shield body radius
+const HAR = 150;   // HP arc radius
+const SPR = 258;   // projectile spawn radius
+
+// State
+let vol      = 50;
+let refills  = 0;
+let absorbed = 0;
+let cvd      = 0;
+let projs    = [];
+let parts    = [];
+let flashes  = [];
+let rings    = [];
+let shakeAmt = 0;
+let flashAlpha = 0;
+let refilling  = false;
+let frameN     = 0;
+
+function rnd(a, b) { return a + Math.random() * (b - a); }
+
+function lerpColor(h1, h2, t) {
+  t = Math.max(0, Math.min(1, t));
+  const r1=parseInt(h1.slice(1,3),16), g1=parseInt(h1.slice(3,5),16), b1=parseInt(h1.slice(5,7),16);
+  const r2=parseInt(h2.slice(1,3),16), g2=parseInt(h2.slice(3,5),16), b2=parseInt(h2.slice(5,7),16);
+  return `rgb(${Math.round(r1+(r2-r1)*t)},${Math.round(g1+(g2-g1)*t)},${Math.round(b1+(b2-b1)*t)})`;
+}
+
+function hpColor(pct) {
+  if (pct > 0.60) return lerpColor('#ff9030', '#f5c842', (pct - 0.60) / 0.40);
+  if (pct > 0.25) return lerpColor('#ff3333', '#ff9030', (pct - 0.25) / 0.35);
+  return '#ff3333';
+}
+
+function hexPath(x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a  = (i / 6) * Math.PI * 2 - Math.PI / 6;
+    const px = x + Math.cos(a) * r;
+    const py = y + Math.sin(a) * r;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+// ── Spawn projectile ──
+function spawnProj() {
+  if (refilling) return;
+  const a   = rnd(0, Math.PI * 2);
+  const spd = rnd(2.6, 4.4);
+  projs.push({
+    x: CX + Math.cos(a) * SPR,
+    y: CY + Math.sin(a) * SPR,
+    vx: -Math.cos(a) * spd,
+    vy: -Math.sin(a) * spd,
+    vol: parseFloat(rnd(1.2, 5.8).toFixed(2)),
+    r: rnd(4.5, 7.5),
+    trail: []
+  });
+}
+
+// ── Hit handler ──
+function onHit(proj) {
+  if (refilling) return;
+  const bite = proj.vol;
+  vol      = Math.max(0, vol - bite);
+  absorbed += bite;
+  cvd      += bite * rnd(0.85, 1.15);
+  shakeAmt = Math.max(shakeAmt, 5 + (1 - vol / 50) * 8);
+
+  // impact flash
+  const hitA = Math.atan2(proj.y - CY, proj.x - CX);
+  const ix   = CX + Math.cos(hitA) * SR;
+  const iy   = CY + Math.sin(hitA) * SR;
+  flashes.push({ x: ix, y: iy, life: 1 });
+
+  // burst particles
+  for (let i = 0; i < 11; i++) {
+    const pa  = hitA + rnd(-0.9, 0.9);
+    const spd = rnd(1.5, 4.2);
+    parts.push({
+      x: ix, y: iy,
+      vx: Math.cos(pa) * spd,
+      vy: Math.sin(pa) * spd,
+      r: rnd(2, 4),
+      life: 1,
+      col: Math.random() > 0.5 ? '#ff5c5c' : '#ff8c30'
+    });
+  }
+
+  updateStats();
+
+  if (vol <= 1.0 && !refilling) {
+    refilling = true;
+    setTimeout(doRefill, 160);
+  }
+}
+
+// ── Refill ──
+function doRefill() {
+  refills++;
+  flashAlpha = 1.0;
+  shakeAmt   = 14;
+
+  // expanding rings
+  for (let i = 0; i < 4; i++) {
+    setTimeout(() => {
+      rings.push({ r: SR, maxR: SPR + 55, life: 1, yellow: i % 2 === 0 });
+    }, i * 85);
+  }
+
+  // burst particles from perimeter
+  for (let i = 0; i < 34; i++) {
+    const a   = (i / 34) * Math.PI * 2 + rnd(-0.1, 0.1);
+    const spd = rnd(2, 6.5);
+    parts.push({
+      x: CX + Math.cos(a) * SR,
+      y: CY + Math.sin(a) * SR,
+      vx: Math.cos(a) * spd,
+      vy: Math.sin(a) * spd,
+      r: rnd(1.5, 5),
+      life: 1,
+      col: Math.random() > 0.35 ? '#f5c842' : (Math.random() > 0.5 ? '#ffffff' : '#ffaa44')
+    });
+  }
+
+  // pop label
+  const pop = document.getElementById('refillPop');
+  pop.style.transition = 'none';
+  pop.style.opacity = '1';
+  pop.style.transform = 'translateX(-50%) translateY(0)';
+  setTimeout(() => {
+    pop.style.transition = 'opacity 0.5s, transform 0.5s';
+    pop.style.opacity = '0';
+    pop.style.transform = 'translateX(-50%) translateY(-14px)';
+  }, 700);
+  setTimeout(() => {
+    pop.style.transition = 'none';
+    pop.style.transform = 'translateX(-50%) translateY(0)';
+  }, 1300);
+
+  // animate vol back to 50
+  const sv = vol;
+  const t0 = performance.now();
+  (function anim(t) {
+    const p    = Math.min(1, (t - t0) / 500);
+    const ease = 1 - (1 - p) * (1 - p);
+    vol = sv + (50 - sv) * ease;
+    updateStats();
+    if (p < 1) requestAnimationFrame(anim);
+    else { vol = 50; refilling = false; updateStats(); }
+  })(performance.now());
+}
+
+function updateStats() {
+  document.getElementById('sRefills').textContent  = refills;
+  document.getElementById('sAbsorbed').textContent = absorbed.toFixed(1);
+  document.getElementById('sCvd').textContent      = '+' + Math.round(cvd);
+}
+
+// ══════════════════════════
+//  UPDATE
+// ══════════════════════════
+function update() {
+  frameN++;
+  for (let i = projs.length - 1; i >= 0; i--) {
+    const p = projs[i];
+    p.trail.push({ x: p.x, y: p.y });
+    if (p.trail.length > 11) p.trail.shift();
+    p.x += p.vx;
+    p.y += p.vy;
+    const d = Math.hypot(p.x - CX, p.y - CY);
+    if (d <= SR + 3) {
+      onHit(p);
+      projs.splice(i, 1);
+    } else if (d > SPR + 90) {
+      projs.splice(i, 1);
+    }
+  }
+}
+
+// ══════════════════════════
+//  DRAW
+// ══════════════════════════
+function draw() {
+  const pct       = vol / 50;
+  const col       = hpColor(pct);
+  const critPulse = pct < 0.22 ? (0.5 + 0.5 * Math.sin(frameN * 0.28)) : 1;
+
+  // shake offset
+  let sx = 0, sy = 0;
+  if (shakeAmt > 0) {
+    sx = rnd(-shakeAmt, shakeAmt);
+    sy = rnd(-shakeAmt, shakeAmt);
+    shakeAmt *= 0.70;
+    if (shakeAmt < 0.3) shakeAmt = 0;
+  }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // ── Background ──
+  ctx.fillStyle = '#08090f';
+  ctx.fillRect(-30, -30, W + 60, H + 60);
+
+  // Ambient glow behind shield
+  const bgG = ctx.createRadialGradient(CX, CY, 0, CX, CY, SPR * 1.3);
+  if (pct < 0.22) {
+    bgG.addColorStop(0, `rgba(160,25,25,${0.09 * critPulse})`);
+  } else {
+    bgG.addColorStop(0, `rgba(140,100,5,${0.04 + pct * 0.05})`);
+  }
+  bgG.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = bgG;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Orbit track ──
+  ctx.beginPath();
+  ctx.arc(CX, CY, SPR, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([3, 13]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Orbit compass dots
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI * 0.5;
+    ctx.beginPath();
+    ctx.arc(CX + Math.cos(a) * SPR, CY + Math.sin(a) * SPR, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx.fill();
+  }
+
+  // ── Expanding rings (refill burst) ──
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const rg = rings[i];
+    rg.r    += (rg.maxR - SR) / 20;
+    rg.life -= 0.04;
+    if (rg.life <= 0) { rings.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(CX, CY, rg.r, 0, Math.PI * 2);
+    ctx.strokeStyle = rg.yellow
+      ? `rgba(245,200,66,${rg.life * 0.85})`
+      : `rgba(255,255,255,${rg.life * 0.5})`;
+    ctx.lineWidth   = rg.life * 2.5;
+    ctx.shadowColor = 'rgba(245,200,66,0.5)';
+    ctx.shadowBlur  = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // ── HP track (full circle, faint) ──
+  ctx.beginPath();
+  ctx.arc(CX, CY, HAR, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth   = 10;
+  ctx.stroke();
+
+  // ── HP arc (active) ──
+  if (pct > 0.005) {
+    const endA = -Math.PI / 2 + pct * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(CX, CY, HAR, -Math.PI / 2, endA);
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 10;
+    ctx.lineCap     = 'round';
+    ctx.shadowColor = col;
+    ctx.shadowBlur  = pct < 0.22 ? 28 * critPulse : 20;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.lineCap = 'butt';
+
+    // Glowing end cap
+    const capX = CX + Math.cos(endA) * HAR;
+    const capY = CY + Math.sin(endA) * HAR;
+    ctx.beginPath();
+    ctx.arc(capX, capY, 6, 0, Math.PI * 2);
+    ctx.fillStyle  = col;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 14;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // ── Shield body ──
+  ctx.beginPath();
+  ctx.arc(CX, CY, SR, 0, Math.PI * 2);
+  const bodyG = ctx.createRadialGradient(CX, CY - SR * 0.2, SR * 0.1, CX, CY, SR);
+  if (pct < 0.22) {
+    bodyG.addColorStop(0, `rgba(38,7,7,0.97)`);
+    bodyG.addColorStop(1, `rgba(10,3,3,0.99)`);
+  } else {
+    bodyG.addColorStop(0, `rgba(14,22,46,0.97)`);
+    bodyG.addColorStop(1, `rgba(5,9,20,0.99)`);
+  }
+  ctx.fillStyle = bodyG;
+  ctx.fill();
+  ctx.strokeStyle = pct < 0.22
+    ? `rgba(255,50,50,${0.14 * critPulse})`
+    : 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // ── Hex grid (very faint inside shield) ──
+  ctx.save();
+  ctx.globalAlpha = 0.045 + 0.025 * (1 - pct);
+  ctx.strokeStyle = '#90a8c8';
+  ctx.lineWidth   = 0.7;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(CX + Math.cos(a) * SR * 0.92, CY + Math.sin(a) * SR * 0.92);
+  }
+  ctx.stroke();
+  hexPath(CX, CY, SR * 0.46); ctx.stroke();
+  hexPath(CX, CY, SR * 0.82); ctx.stroke();
+  ctx.restore();
+
+  // ── Center text ──
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+
+  // small level label
+  ctx.font      = '600 11px Inter';
+  ctx.fillStyle = 'rgba(245,200,66,0.38)';
+  ctx.fillText('⬡  УРОВЕНЬ  65,230.00', CX, CY - 52);
+
+  // big vol number
+  ctx.font        = '900 64px Inter';
+  ctx.fillStyle   = col;
+  ctx.shadowColor = col;
+  ctx.shadowBlur  = pct < 0.22 ? 30 * critPulse : 18;
+  ctx.fillText(vol.toFixed(2), CX, CY + 4);
+  ctx.shadowBlur = 0;
+
+  // BTC unit
+  ctx.font      = '700 18px Inter';
+  ctx.fillStyle = `rgba(245,200,66,0.48)`;
+  ctx.fillText('BTC', CX, CY + 48);
+
+  // ── Projectiles ──
+  for (const p of projs) {
+    // Trail
+    for (let j = 0; j < p.trail.length; j++) {
+      const ta = (j / p.trail.length) * 0.45;
+      const tr = p.r * 0.55 * (j / p.trail.length);
+      ctx.beginPath();
+      ctx.arc(p.trail[j].x, p.trail[j].y, Math.max(0.3, tr), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,70,70,${ta})`;
+      ctx.fill();
+    }
+    // Halo glow
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,40,40,0.10)';
+    ctx.fill();
+    // Core
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle   = '#ff5c5c';
+    ctx.shadowColor = '#ff1e1e';
+    ctx.shadowBlur  = 16;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // ── Particles ──
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.91; p.vy *= 0.91;
+    p.life -= 0.036;
+    if (p.life <= 0) { parts.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+    ctx.fillStyle   = p.col;
+    ctx.globalAlpha = p.life;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Impact flashes ──
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    const f = flashes[i];
+    f.life -= 0.11;
+    if (f.life <= 0) { flashes.splice(i, 1); continue; }
+    const prog = 1 - f.life;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 7 + prog * 24, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,190,90,${f.life * 0.55})`;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 3 + prog * 10, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,200,${f.life * 0.9})`;
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // ── Screen flash (no shake applied) ──
+  if (flashAlpha > 0) {
+    if (flashAlpha > 0.6) {
+      ctx.fillStyle = `rgba(255,255,255,${(flashAlpha - 0.6) * 0.55})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.fillStyle = `rgba(245,200,66,${flashAlpha * 0.28})`;
+    ctx.fillRect(0, 0, W, H);
+    flashAlpha = Math.max(0, flashAlpha - 0.055);
+  }
+}
+
+// ── Main loop ──
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ── Spawn timer: 1-2 projectiles every ~560ms ──
+setInterval(() => {
+  spawnProj();
+  if (!refilling && Math.random() > 0.52) spawnProj();
+}, 560);
+
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+</script>
+</body>
+</html>

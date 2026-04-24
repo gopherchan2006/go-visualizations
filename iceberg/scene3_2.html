@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene 3 — Уровень мигает</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #050608;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.frame {
+  width: 540px;
+  height: 960px;
+  background: #0b0d16;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 4px;
+  box-shadow: 0 0 80px rgba(0,0,0,0.8);
+}
+
+/* ambient glows */
+.glow-red {
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 340px; height: 340px;
+  background: radial-gradient(circle, rgba(255,80,80,0.08) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+.glow-yellow {
+  position: absolute;
+  top: 300px; left: 50%;
+  transform: translateX(-50%);
+  width: 400px; height: 200px;
+  background: radial-gradient(ellipse, rgba(245,200,66,0.06) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  transition: opacity 0.3s;
+}
+.glow-green {
+  position: absolute;
+  bottom: 80px; left: -60px;
+  width: 260px; height: 260px;
+  background: radial-gradient(circle, rgba(50,220,130,0.06) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ── Header ── */
+.header {
+  position: relative; z-index: 2;
+  padding: 20px 24px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 100%);
+}
+.pair-wrap { display: flex; flex-direction: column; gap: 5px; }
+.pair { font-size: 24px; font-weight: 800; color: #eef0f8; letter-spacing: 0.3px; }
+.pair em { color: rgba(238,240,248,0.3); font-style: normal; font-weight: 500; }
+.scene-tag {
+  font-size: 10px; font-weight: 700; color: #3a4a70;
+  letter-spacing: 1.8px; text-transform: uppercase;
+}
+.price-wrap { text-align: right; display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
+.price-main {
+  font-size: 32px; font-weight: 800; color: #f5c842; letter-spacing: -1px;
+  text-shadow: 0 0 28px rgba(245,200,66,0.4);
+}
+.live-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; color: #3a4a70;
+  letter-spacing: 1.5px; text-transform: uppercase;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 8px rgba(46,204,113,0.9);
+  animation: liveBlink 2s ease-in-out infinite;
+}
+@keyframes liveBlink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+/* ── Column labels ── */
+.col-labels {
+  position: relative; z-index: 2;
+  display: flex;
+  padding: 8px 24px 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  background: rgba(0,0,0,0.1);
+}
+.col-label {
+  font-size: 10px; font-weight: 700;
+  color: #252e4a; text-transform: uppercase; letter-spacing: 1.3px;
+  flex: 1;
+}
+.col-label.r { text-align: right; }
+
+/* ── Orderbook ── */
+.orderbook {
+  position: relative; z-index: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ob-section-asks {
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.ob-section-bids {
+  display: flex; flex-direction: column;
+}
+
+.ob-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 24px 6px 24px;
+  position: relative;
+  font-size: 14px;
+}
+.ob-depth {
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  border-radius: 2px 0 0 2px;
+  transition: width 0.4s ease;
+}
+.ask-depth { background: rgba(255,92,92,0.16); }
+.bid-depth { background: rgba(50,220,130,0.16); }
+
+.ob-price { font-weight: 700; min-width: 100px; letter-spacing: 0.1px; position: relative; z-index: 1; }
+.ask-row .ob-price { color: #ff5c5c; }
+.bid-row .ob-price { color: #32dc82; }
+.ob-size {
+  font-weight: 600; font-size: 13.5px;
+  color: #c0c8e0;
+  min-width: 70px; text-align: right;
+  position: relative; z-index: 1;
+  transition: color 0.2s;
+}
+.ob-total {
+  color: #252e4a; min-width: 60px; text-align: right;
+  font-size: 11.5px; font-weight: 500;
+  position: relative; z-index: 1;
+}
+
+/* ── Frozen / iceberg row ── */
+.row-ice {
+  background: rgba(245,200,66,0.04);
+  border-top: 1px solid rgba(245,200,66,0.1);
+  border-bottom: 1px solid rgba(245,200,66,0.1);
+}
+.ob-row.row-ice .ob-price {
+  color: #f5c842;
+  text-shadow: 0 0 16px rgba(245,200,66,0.6);
+}
+
+.ice-vol {
+  display: inline-block;
+  min-width: 70px; text-align: right;
+  font-size: 13.5px; font-weight: 700;
+  color: #f5c842;
+  position: relative; z-index: 1;
+  transition: color 0.15s;
+}
+
+.ice-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  background: rgba(245,200,66,0.1);
+  border: 1px solid rgba(245,200,66,0.3);
+  border-radius: 5px;
+  font-size: 9px; font-weight: 800;
+  color: #f5c842; letter-spacing: 1.5px;
+  text-shadow: 0 0 8px rgba(245,200,66,0.7);
+  position: relative; z-index: 1;
+  white-space: nowrap;
+}
+
+/* glow under ice row when depleting */
+.row-ice-depth {
+  position: absolute; top: 0; bottom: 0; right: 0;
+  background: linear-gradient(to left, rgba(245,200,66,0.18), transparent);
+  border-radius: 2px 0 0 2px;
+  transition: width 0.35s ease;
+}
+
+/* ── Spread row ── */
+.spread-row {
+  padding: 12px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-top: 1px solid rgba(245,200,66,0.12);
+  border-bottom: 1px solid rgba(245,200,66,0.12);
+  background: rgba(245,200,66,0.035);
+  position: relative; z-index: 2;
+}
+.spread-lbl { font-size: 10px; font-weight: 800; color: #3a4a70; letter-spacing: 2px; }
+.spread-price {
+  font-size: 26px; font-weight: 800; color: #f5c842; letter-spacing: -0.5px;
+  text-shadow: 0 0 24px rgba(245,200,66,0.5);
+}
+.spread-chg { font-size: 12px; font-weight: 700; color: #32dc82; }
+
+/* ── Stats bar ── */
+.stats-bar {
+  position: relative; z-index: 2;
+  padding: 14px 24px;
+  display: flex; justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  gap: 8px;
+}
+.stat-card {
+  flex: 1;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.stat-lbl { font-size: 9.5px; font-weight: 700; color: #2a3555; letter-spacing: 1.6px; text-transform: uppercase; }
+.stat-val { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+.stat-val.yellow { color: #f5c842; text-shadow: 0 0 14px rgba(245,200,66,0.5); }
+.stat-val.green  { color: #32dc82; text-shadow: 0 0 14px rgba(50,220,130,0.4); }
+.stat-val.red    { color: #ff5c5c; }
+.stat-sub { font-size: 10px; font-weight: 500; color: #3a4a70; }
+
+/* ── Message pop ── */
+.msg-pop {
+  position: absolute; z-index: 10;
+  left: 50%; transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(8,10,18,0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(245,200,66,0.35);
+  border-radius: 12px;
+  padding: 10px 22px;
+  font-size: 13px; font-weight: 700;
+  color: #f5c842;
+  letter-spacing: 0.3px;
+  text-shadow: 0 0 12px rgba(245,200,66,0.6);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 40px rgba(245,200,66,0.08);
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+  top: 420px;
+}
+
+/* ── Tape mini ── */
+.tape-section {
+  position: relative; z-index: 2;
+  flex: 1;
+  overflow: hidden;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.tape-header {
+  padding: 9px 24px 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  background: rgba(0,0,0,0.15);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.tape-title { font-size: 10px; font-weight: 700; color: #252e4a; letter-spacing: 1.6px; text-transform: uppercase; }
+.tape-badge {
+  font-size: 9px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 4px;
+  background: rgba(50,220,130,0.1); border: 1px solid rgba(50,220,130,0.25);
+  color: #32dc82;
+}
+.tape-inner-wrap { overflow: hidden; height: 100%; position: relative; }
+.tape-scroll {
+  position: absolute; top: 0; width: 100%;
+  animation: tapeScroll 3s linear infinite;
+}
+@keyframes tapeScroll {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+.tape-row {
+  display: flex; align-items: center;
+  padding: 6px 24px; font-size: 13px;
+  border-bottom: 1px solid rgba(255,255,255,0.025);
+  gap: 8px; position: relative;
+}
+.t-side {
+  width: 3px; position: absolute; left: 0; top: 0; bottom: 0;
+  border-radius: 0 2px 2px 0;
+}
+.sell .t-side { background: #ff5c5c; box-shadow: 1px 0 5px rgba(255,92,92,0.4); }
+.buy  .t-side { background: #32dc82; box-shadow: 1px 0 5px rgba(50,220,130,0.4); }
+.t-time { font-size: 10px; font-weight: 500; color: #252e4a; min-width: 42px; }
+.t-price { font-weight: 700; flex: 1; }
+.sell .t-price { color: #ff5c5c; }
+.buy  .t-price { color: #32dc82; }
+.t-vol { font-size: 12px; font-weight: 600; min-width: 50px; text-align: right; }
+.sell .t-vol { color: #7a2828; }
+.buy  .t-vol  { color: #1a6035; }
+.t-vol-big { color: #f5c842 !important; font-weight: 800 !important; }
+
+/* ── Footer ── */
+.footer {
+  position: relative; z-index: 2;
+  padding: 13px 24px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(0deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+  flex-shrink: 0;
+}
+.f-col { display: flex; flex-direction: column; gap: 4px; }
+.f-col.c { align-items: center; }
+.f-col.r { align-items: flex-end; }
+.f-lbl { font-size: 10px; font-weight: 700; color: #252e4a; text-transform: uppercase; letter-spacing: 1.3px; }
+.f-val { font-size: 15px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="glow-red"></div>
+  <div class="glow-yellow" id="glowYellow"></div>
+  <div class="glow-green"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="pair-wrap">
+      <div class="pair">BTC<em>/USDT</em></div>
+      <div class="scene-tag">Обнаружен айсберг</div>
+    </div>
+    <div class="price-wrap">
+      <div class="price-main">65,230.00</div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>
+  </div>
+
+  <!-- Column labels -->
+  <div class="col-labels">
+    <div class="col-label" style="flex:1.4">Цена (USDT)</div>
+    <div class="col-label r" style="flex:1">Объём (BTC)</div>
+    <div class="col-label r" style="flex:0.9">Всего</div>
+  </div>
+
+  <!-- Asks (above frozen level) -->
+  <div class="orderbook ob-section-asks" id="asks">
+    <div class="ob-row ask-row"><div class="ob-depth ask-depth" style="width:12%"></div><div class="ob-price">65,237.50</div><div class="ob-size">4.21</div><div class="ob-total">18.64</div></div>
+    <div class="ob-row ask-row"><div class="ob-depth ask-depth" style="width:18%"></div><div class="ob-price">65,235.00</div><div class="ob-size">6.87</div><div class="ob-total">14.43</div></div>
+    <div class="ob-row ask-row"><div class="ob-depth ask-depth" style="width:22%"></div><div class="ob-price">65,232.50</div><div class="ob-size">8.14</div><div class="ob-total">7.56</div></div>
+    <div class="ob-row ask-row"><div class="ob-depth ask-depth" style="width:10%"></div><div class="ob-price">65,231.00</div><div class="ob-size">3.12</div><div class="ob-total">3.12</div></div>
+    <!-- Frozen ICE row -->
+    <div class="ob-row ask-row row-ice" id="iceRow">
+      <div class="row-ice-depth" id="iceDepth" style="width:60%"></div>
+      <div class="ob-price">65,230.00</div>
+      <div class="ice-vol" id="iceVol">47.80</div>
+      <div class="ice-badge" id="iceBadge">⬡ ICE</div>
+    </div>
+  </div>
+
+  <!-- Spread -->
+  <div class="spread-row">
+    <div class="spread-lbl">LAST</div>
+    <div class="spread-price">65,230.00</div>
+    <div class="spread-chg">+0.12%</div>
+  </div>
+
+  <!-- Bids (below) -->
+  <div class="orderbook ob-section-bids" id="bids">
+    <div class="ob-row bid-row"><div class="ob-depth bid-depth" style="width:20%"></div><div class="ob-price">65,229.00</div><div class="ob-size">7.24</div><div class="ob-total">7.24</div></div>
+    <div class="ob-row bid-row"><div class="ob-depth bid-depth" style="width:30%"></div><div class="ob-price">65,227.50</div><div class="ob-size">11.30</div><div class="ob-total">18.54</div></div>
+    <div class="ob-row bid-row"><div class="ob-depth bid-depth" style="width:14%"></div><div class="ob-price">65,225.00</div><div class="ob-size">5.22</div><div class="ob-total">23.76</div></div>
+    <div class="ob-row bid-row"><div class="ob-depth bid-depth" style="width:9%"></div><div class="ob-price">65,222.50</div><div class="ob-size">3.66</div><div class="ob-total">27.42</div></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-lbl">Обновлений</div>
+      <div class="stat-val yellow" id="statUpdates">0</div>
+      <div class="stat-sub">уровень восстановлен</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">CVD</div>
+      <div class="stat-val green" id="statCvd">+0</div>
+      <div class="stat-sub">Δ delta cumul.</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Поглощено</div>
+      <div class="stat-val red" id="statAbsorbed">0</div>
+      <div class="stat-sub">BTC съедено</div>
+    </div>
+  </div>
+
+  <!-- Message pop -->
+  <div class="msg-pop" id="msgPop"></div>
+
+  <!-- Tape -->
+  <div class="tape-section">
+    <div class="tape-header">
+      <div class="tape-title">Лента принтов</div>
+      <div class="tape-badge" id="tapeBadge">ПОГЛОЩЕНИЕ</div>
+    </div>
+    <div class="tape-inner-wrap">
+      <div class="tape-scroll" id="tapeScroll"></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="f-col">
+      <div class="f-lbl">BID</div>
+      <div class="f-val" style="color:#32dc82">65,229.00</div>
+    </div>
+    <div class="f-col c">
+      <div class="f-lbl">СПРЕД</div>
+      <div class="f-val" style="color:#f5c842">1.00</div>
+    </div>
+    <div class="f-col r">
+      <div class="f-lbl">ASK</div>
+      <div class="f-val" style="color:#ff5c5c">65,231.00</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let iceVol      = 48.0;   // current visible volume at ice level
+const ICE_MAX   = 50.0;   // refill target
+const ICE_MIN   = 2.0;    // trigger refill when below
+let updates     = 0;
+let cvd         = 0;
+let absorbed    = 0;
+
+// tape data
+const PRICE = '65,230.00';
+let tapeRows = [];
+
+function rnd(min, max) { return +(min + Math.random()*(max-min)).toFixed(2); }
+
+// ── Build initial tape ──
+function buildTape() {
+  const rows = [];
+  let base = new Date(); base.setSeconds(base.getSeconds() - 80);
+  for (let i = 0; i < 40; i++) {
+    const vol = rnd(0.8, 12);
+    const side = (i % 3 === 0) ? 'buy' : 'sell';
+    const t = new Date(base.getTime() + i * 2000);
+    const ts = t.toTimeString().slice(0,8);
+    rows.push({ ts, vol, side });
+  }
+  return rows;
+}
+
+function renderTape(rows) {
+  // duplicate for seamless loop
+  const all = [...rows, ...rows];
+  const frag = all.map(r => {
+    const bigClass = r.vol >= 8 ? 't-vol-big' : '';
+    return `<div class="tape-row ${r.side}">
+      <div class="t-side"></div>
+      <div class="t-time">${r.ts}</div>
+      <div class="t-price">${PRICE}</div>
+      <div class="t-vol ${bigClass}">${r.vol.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('tapeScroll').innerHTML = frag;
+}
+
+tapeRows = buildTape();
+renderTape(tapeRows);
+
+// ── DOM refs ──
+const iceVolEl    = document.getElementById('iceVol');
+const iceDepthEl  = document.getElementById('iceDepth');
+const iceRowEl    = document.getElementById('iceRow');
+const iceBadgeEl  = document.getElementById('iceBadge');
+const statUpdEl   = document.getElementById('statUpdates');
+const statCvdEl   = document.getElementById('statCvd');
+const statAbsEl   = document.getElementById('statAbsorbed');
+const msgPopEl    = document.getElementById('msgPop');
+const glowYellEl  = document.getElementById('glowYellow');
+
+function updateDisplay() {
+  iceVolEl.textContent = iceVol.toFixed(2);
+  const pct = Math.max(4, Math.min(88, (iceVol / ICE_MAX) * 80));
+  iceDepthEl.style.width = pct + '%';
+  statUpdEl.textContent  = updates;
+  statCvdEl.textContent  = '+' + cvd.toFixed(0);
+  statAbsEl.textContent  = absorbed.toFixed(1);
+}
+
+function showMsg(text, duration = 800) {
+  msgPopEl.textContent = text;
+  msgPopEl.style.opacity = '1';
+  setTimeout(() => { msgPopEl.style.opacity = '0'; }, duration);
+}
+
+// ── Drain phase ── market orders hit, volume drops
+function drainCycle() {
+  const drainAmount = rnd(0.8, 5.5);
+  iceVol = Math.max(0.5, iceVol - drainAmount);
+  absorbed += drainAmount;
+  cvd += drainAmount * rnd(0.7, 1.2);
+
+  // flash the ice row red briefly
+  iceVolEl.style.color = '#ff5c5c';
+  iceRowEl.style.background = 'rgba(255,92,92,0.07)';
+  setTimeout(() => {
+    iceVolEl.style.color = '#f5c842';
+    iceRowEl.style.background = 'rgba(245,200,66,0.04)';
+  }, 220);
+
+  updateDisplay();
+
+  if (iceVol <= ICE_MIN) {
+    // trigger refill after short delay
+    setTimeout(refillCycle, 250);
+  }
+}
+
+// ── Refill phase ── hidden reserve tops up level
+function refillCycle() {
+  updates++;
+  const oldVol = iceVol;
+
+  // yellow flash on glow + row
+  glowYellEl.style.opacity = '1';
+  iceRowEl.style.background = 'rgba(245,200,66,0.15)';
+  iceVolEl.style.color = '#ffffff';
+  iceVolEl.style.textShadow = '0 0 18px rgba(245,200,66,0.9)';
+
+  showMsg(`⬡ Уровень восстановлен #${updates}`, 1000);
+
+  // animate vol jumping back to max
+  let steps = 0;
+  const interval = setInterval(() => {
+    iceVol = Math.min(ICE_MAX, iceVol + (ICE_MAX - oldVol) / 6);
+    steps++;
+    updateDisplay();
+    if (steps >= 6) {
+      clearInterval(interval);
+      iceVol = ICE_MAX;
+      updateDisplay();
+      // fade back to normal
+      setTimeout(() => {
+        iceRowEl.style.background = 'rgba(245,200,66,0.04)';
+        iceVolEl.style.color = '#f5c842';
+        iceVolEl.style.textShadow = '';
+        glowYellEl.style.opacity = '0.6';
+      }, 400);
+    }
+  }, 60);
+}
+
+// ── Main loop: drain every 380ms ──
+setInterval(drainCycle, 380);
+
+updateDisplay();
+</script>
+</body>
+</html>

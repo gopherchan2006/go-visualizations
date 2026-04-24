@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene 3 — Резервуар</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #050608;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+}
+
+.frame {
+  width: 540px;
+  height: 960px;
+  background: #08090f;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px;
+  box-shadow: 0 0 80px rgba(0,0,0,0.9);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════
+   AMBIENT GLOWS
+═══════════════════════════════ */
+.glow-top {
+  position: absolute; top: -100px; left: 50%;
+  transform: translateX(-50%);
+  width: 500px; height: 300px;
+  background: radial-gradient(ellipse, rgba(255,80,80,0.06) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+.glow-center {
+  position: absolute; top: 300px; left: 50%;
+  transform: translateX(-50%);
+  width: 480px; height: 400px;
+  background: radial-gradient(ellipse, rgba(245,200,66,0.05) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  transition: opacity 0.3s;
+  opacity: 0.4;
+}
+.glow-bottom {
+  position: absolute; bottom: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 400px; height: 250px;
+  background: radial-gradient(ellipse, rgba(50,220,130,0.05) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ═══════════════════════════════
+   HEADER: one orderbook row
+═══════════════════════════════ */
+.ob-header {
+  position: relative; z-index: 2;
+  padding: 22px 28px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+}
+.ob-pair { font-size: 13px; font-weight: 700; color: #2a3555; letter-spacing: 2px; text-transform: uppercase; }
+.ob-level {
+  display: flex; align-items: center; gap: 14px;
+  background: rgba(245,200,66,0.06);
+  border: 1px solid rgba(245,200,66,0.18);
+  border-radius: 10px;
+  padding: 8px 18px;
+}
+.ob-price-lbl { font-size: 18px; font-weight: 800; color: #f5c842; letter-spacing: 0.2px; text-shadow: 0 0 18px rgba(245,200,66,0.5); }
+.ob-bar-wrap {
+  width: 100px; height: 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px; overflow: hidden;
+}
+.ob-bar-fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(245,200,66,0.4), rgba(245,200,66,0.8));
+  transition: width 0.35s ease;
+  box-shadow: 0 0 8px rgba(245,200,66,0.4);
+}
+.ob-vol-lbl { font-size: 15px; font-weight: 700; color: #f5c842; min-width: 52px; text-align: right; }
+.ice-pill {
+  padding: 3px 9px; border-radius: 6px;
+  background: rgba(245,200,66,0.1); border: 1px solid rgba(245,200,66,0.3);
+  font-size: 9px; font-weight: 800; color: #f5c842; letter-spacing: 1.5px;
+  text-shadow: 0 0 8px rgba(245,200,66,0.6);
+  animation: icePulse 1.4s ease-in-out infinite;
+}
+@keyframes icePulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+.price-fixed {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+}
+.price-val { font-size: 22px; font-weight: 800; color: #eef0f8; letter-spacing: -0.5px; }
+.price-sub { font-size: 10px; font-weight: 600; color: #3a4a70; letter-spacing: 2px; }
+
+/* ═══════════════════════════════
+   INCOMING ORDERS (left column)
+═══════════════════════════════ */
+.incoming-col {
+  position: absolute;
+  left: 0; top: 160px; bottom: 280px;
+  width: 140px;
+  z-index: 3;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 10px;
+}
+.in-label {
+  position: absolute; top: 0; left: 14px;
+  font-size: 9px; font-weight: 700; color: #252e4a; letter-spacing: 1.8px; text-transform: uppercase;
+}
+.arrow-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px 5px 14px;
+  animation: arrowFly 0.4s ease-out forwards;
+  opacity: 0;
+}
+@keyframes arrowFly {
+  0%   { opacity: 0; transform: translateX(-30px); }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(10px); }
+}
+.arrow-icon { font-size: 12px; color: #ff5c5c; }
+.arrow-vol  { font-size: 13px; font-weight: 700; color: #ff5c5c; }
+.arrow-unit { font-size: 10px; font-weight: 500; color: #5a2828; }
+
+/* ═══════════════════════════════
+   TANK (center)
+═══════════════════════════════ */
+.tank-section {
+  flex: 1;
+  position: relative; z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 140px;
+  gap: 0;
+}
+
+/* big vol number */
+.vol-number {
+  font-size: 88px;
+  font-weight: 900;
+  color: #f5c842;
+  letter-spacing: -4px;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 0 50px rgba(245,200,66,0.4);
+  transition: color 0.15s, text-shadow 0.15s;
+  font-variant-numeric: tabular-nums;
+  min-width: 220px;
+}
+.vol-unit {
+  font-size: 22px; font-weight: 700;
+  color: rgba(245,200,66,0.5);
+  text-align: center;
+  margin-top: 2px;
+  margin-bottom: 22px;
+}
+
+/* tank bar */
+.tank-wrap {
+  width: 100%;
+  position: relative;
+}
+.tank-outer {
+  width: 100%;
+  height: 44px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+.tank-fill {
+  height: 100%;
+  border-radius: 11px;
+  background: linear-gradient(90deg, rgba(245,150,30,0.7), rgba(245,200,66,0.9));
+  box-shadow: 0 0 24px rgba(245,200,66,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: width 0.35s ease;
+  position: relative;
+  overflow: hidden;
+}
+/* shimmer on tank fill */
+.tank-fill::after {
+  content: '';
+  position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  animation: tankShimmer 2.2s linear infinite;
+}
+@keyframes tankShimmer { 0%{left:-60%} 100%{left:160%} }
+
+/* critical flash */
+.tank-fill.critical {
+  background: linear-gradient(90deg, rgba(255,60,60,0.7), rgba(255,92,92,0.9));
+  box-shadow: 0 0 24px rgba(255,60,60,0.6);
+  animation: critFlash 0.3s ease-in-out infinite alternate;
+}
+@keyframes critFlash { 0%{opacity:0.6} 100%{opacity:1} }
+
+/* refill flash overlay */
+.tank-flash {
+  position: absolute; inset: 0; border-radius: 11px;
+  background: rgba(255,255,255,0.85);
+  opacity: 0; pointer-events: none;
+  border-radius: 11px;
+}
+
+.tank-ticks {
+  display: flex; justify-content: space-between;
+  padding: 5px 2px 0;
+}
+.tank-tick { font-size: 9px; font-weight: 600; color: #1e2840; }
+
+/* ═══════════════════════════════
+   STATS ROW
+═══════════════════════════════ */
+.stats-row {
+  position: relative; z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 28px;
+  gap: 12px;
+  margin-top: 28px;
+  margin-bottom: 8px;
+}
+.stat-box {
+  flex: 1;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.055);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.stat-box.highlight {
+  border-color: rgba(245,200,66,0.2);
+  background: rgba(245,200,66,0.04);
+}
+.sb-lbl { font-size: 9px; font-weight: 700; color: #1e2840; letter-spacing: 1.8px; text-transform: uppercase; }
+.sb-val { font-size: 26px; font-weight: 800; letter-spacing: -1px; }
+.sb-val.yellow { color: #f5c842; text-shadow: 0 0 14px rgba(245,200,66,0.5); }
+.sb-val.green  { color: #32dc82; text-shadow: 0 0 12px rgba(50,220,130,0.4); }
+.sb-val.red    { color: #ff5c5c; }
+.sb-sub { font-size: 10px; font-weight: 500; color: #2a3555; }
+
+/* refill counter pop */
+.refill-pop {
+  position: absolute; z-index: 10;
+  top: -22px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: 800;
+  color: #f5c842; letter-spacing: 0.3px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.4s;
+  pointer-events: none;
+  text-shadow: 0 0 10px rgba(245,200,66,0.8);
+}
+
+/* ═══════════════════════════════
+   BOTTOM: price frozen label
+═══════════════════════════════ */
+.price-row {
+  position: relative; z-index: 2;
+  padding: 18px 28px 22px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(0deg, rgba(255,255,255,0.015) 0%, transparent 100%);
+}
+.pr-left { display: flex; flex-direction: column; gap: 4px; }
+.pr-lbl { font-size: 10px; font-weight: 700; color: #252e4a; letter-spacing: 2px; text-transform: uppercase; }
+.pr-val {
+  font-size: 34px; font-weight: 800; color: #eef0f8; letter-spacing: -1px;
+  text-shadow: 0 0 24px rgba(255,255,255,0.08);
+}
+.frozen-badge {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
+}
+.fr-tag {
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 6px;
+  background: rgba(50,220,130,0.08); border: 1px solid rgba(50,220,130,0.2);
+  color: #32dc82;
+  animation: frBlink 2s ease-in-out infinite;
+}
+@keyframes frBlink { 0%,100%{opacity:0.4} 50%{opacity:1} }
+.fr-delta { font-size: 13px; font-weight: 700; color: #1a6035; }
+
+/* ═══════════════════════════════
+   FLASH OVERLAY (whole frame)
+═══════════════════════════════ */
+.frame-flash {
+  position: absolute; inset: 0; z-index: 20;
+  background: rgba(245,200,66,0.12);
+  opacity: 0; pointer-events: none;
+  border-radius: 4px;
+}
+</style>
+</head>
+<body>
+<div class="frame" id="frame">
+  <div class="glow-top"></div>
+  <div class="glow-center" id="glowCenter"></div>
+  <div class="glow-bottom"></div>
+  <div class="frame-flash" id="frameFlash"></div>
+
+  <!-- Header: one frozen OB row -->
+  <div class="ob-header">
+    <div>
+      <div class="ob-pair">BTC / USDT</div>
+      <div style="margin-top:12px; display:flex; align-items:center; gap:10px;">
+        <div class="ob-level">
+          <div class="ob-price-lbl">65,230.00</div>
+          <div class="ob-bar-wrap"><div class="ob-bar-fill" id="obBarFill" style="width:100%"></div></div>
+          <div class="ob-vol-lbl" id="obVolLbl">50.00</div>
+          <div class="ice-pill">⬡ ICE</div>
+        </div>
+      </div>
+    </div>
+    <div class="price-fixed">
+      <div class="price-val">65,230.00</div>
+      <div class="price-sub">ЦЕНА ЗАМОРОЖЕНА</div>
+    </div>
+  </div>
+
+  <!-- Incoming orders (left overlay) -->
+  <div class="incoming-col" id="incomingCol">
+    <div class="in-label">РЫНОЧНЫЕ</div>
+  </div>
+
+  <!-- Tank section -->
+  <div class="tank-section">
+    <div class="vol-number" id="volNum">50.00</div>
+    <div class="vol-unit">BTC на уровне</div>
+
+    <div class="tank-wrap">
+      <div class="tank-outer">
+        <div class="tank-fill" id="tankFill" style="width:100%">
+          <div class="tank-flash" id="tankFlash"></div>
+        </div>
+      </div>
+      <div class="tank-ticks">
+        <span class="tank-tick">0</span>
+        <span class="tank-tick">12.5</span>
+        <span class="tank-tick">25</span>
+        <span class="tank-tick">37.5</span>
+        <span class="tank-tick">50</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-box highlight" style="position:relative">
+      <div class="refill-pop" id="refillPop">⬡ Восстановлен!</div>
+      <div class="sb-lbl">Обновлений</div>
+      <div class="sb-val yellow" id="statRefills">0</div>
+      <div class="sb-sub">уровень перезаряжен</div>
+    </div>
+    <div class="stat-box">
+      <div class="sb-lbl">Поглощено</div>
+      <div class="sb-val red" id="statAbsorbed">0.00</div>
+      <div class="sb-sub">BTC съедено рынком</div>
+    </div>
+    <div class="stat-box">
+      <div class="sb-lbl">CVD Δ</div>
+      <div class="sb-val green" id="statCvd">+0</div>
+      <div class="sb-sub">нарастающий итог</div>
+    </div>
+  </div>
+
+  <!-- Bottom price row -->
+  <div class="price-row">
+    <div class="pr-left">
+      <div class="pr-lbl">Last Price</div>
+      <div class="pr-val">65,230.00</div>
+    </div>
+    <div class="frozen-badge">
+      <div class="fr-tag">FROZEN</div>
+      <div class="fr-delta" id="priceDelta">Δ 0.00 (0.000%)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICE_MAX  = 50.0;
+const ICE_CRIT = 3.5;   // trigger refill below this
+const DRAIN_MS = 350;   // drain tick interval
+
+let vol       = ICE_MAX;
+let refills   = 0;
+let absorbed  = 0;
+let cvd       = 0;
+let isRefilling = false;
+
+// DOM
+const volNumEl      = document.getElementById('volNum');
+const tankFillEl    = document.getElementById('tankFill');
+const tankFlashEl   = document.getElementById('tankFlash');
+const obBarFillEl   = document.getElementById('obBarFill');
+const obVolLblEl    = document.getElementById('obVolLbl');
+const statRefillsEl = document.getElementById('statRefills');
+const statAbsEl     = document.getElementById('statAbsorbed');
+const statCvdEl     = document.getElementById('statCvd');
+const refillPopEl   = document.getElementById('refillPop');
+const frameFlashEl  = document.getElementById('frameFlash');
+const glowCenterEl  = document.getElementById('glowCenter');
+const incomingColEl = document.getElementById('incomingCol');
+
+function rnd(a, b) { return +(a + Math.random() * (b - a)).toFixed(2); }
+
+function updateDisplay() {
+  const pct = Math.max(1, (vol / ICE_MAX) * 100);
+
+  volNumEl.textContent  = vol.toFixed(2);
+  obVolLblEl.textContent = vol.toFixed(2);
+  tankFillEl.style.width = pct + '%';
+  obBarFillEl.style.width = pct + '%';
+
+  statRefillsEl.textContent = refills;
+  statAbsEl.textContent     = absorbed.toFixed(2);
+  statCvdEl.textContent     = '+' + cvd.toFixed(0);
+
+  // critical state
+  if (vol <= ICE_CRIT && !isRefilling) {
+    tankFillEl.classList.add('critical');
+    volNumEl.style.color       = '#ff5c5c';
+    volNumEl.style.textShadow  = '0 0 50px rgba(255,60,60,0.6)';
+    glowCenterEl.style.opacity = '0.15';
+  } else if (!isRefilling) {
+    tankFillEl.classList.remove('critical');
+    volNumEl.style.color       = '#f5c842';
+    volNumEl.style.textShadow  = '0 0 50px rgba(245,200,66,0.4)';
+    glowCenterEl.style.opacity = String(0.3 + (vol / ICE_MAX) * 0.5);
+  }
+}
+
+// ── Spawn incoming arrow ──
+function spawnArrow(amount) {
+  const row = document.createElement('div');
+  row.className = 'arrow-row';
+  row.innerHTML = `<span class="arrow-icon">→</span><span class="arrow-vol">${amount.toFixed(2)}</span><span class="arrow-unit">BTC</span>`;
+  incomingColEl.appendChild(row);
+  setTimeout(() => row.remove(), 420);
+}
+
+// ── Refill animation ──
+function doRefill() {
+  isRefilling = true;
+  refills++;
+  tankFillEl.classList.remove('critical');
+
+  // white flash on tank
+  tankFlashEl.style.transition = 'none';
+  tankFlashEl.style.opacity    = '1';
+  setTimeout(() => {
+    tankFlashEl.style.transition = 'opacity 0.5s';
+    tankFlashEl.style.opacity    = '0';
+  }, 60);
+
+  // yellow frame flash
+  frameFlashEl.style.transition = 'none';
+  frameFlashEl.style.opacity    = '1';
+  setTimeout(() => {
+    frameFlashEl.style.transition = 'opacity 0.6s';
+    frameFlashEl.style.opacity    = '0';
+  }, 80);
+
+  // pop label
+  refillPopEl.style.opacity   = '1';
+  refillPopEl.style.transform = 'translateX(-50%) translateY(-8px)';
+  setTimeout(() => {
+    refillPopEl.style.transition = 'opacity 0.5s, transform 0.5s';
+    refillPopEl.style.opacity    = '0';
+    refillPopEl.style.transform  = 'translateX(-50%) translateY(-20px)';
+  }, 700);
+  setTimeout(() => {
+    refillPopEl.style.transition = 'none';
+    refillPopEl.style.transform  = 'translateX(-50%)';
+  }, 1300);
+
+  // animate vol up in steps
+  const target = ICE_MAX;
+  const steps  = 8;
+  const delta  = (target - vol) / steps;
+  let step = 0;
+  const iv = setInterval(() => {
+    vol = Math.min(target, vol + delta);
+    step++;
+    updateDisplay();
+    if (step >= steps) {
+      clearInterval(iv);
+      vol = target;
+      updateDisplay();
+      isRefilling = false;
+    }
+  }, 40);
+}
+
+// ── Drain tick ──
+function drainTick() {
+  if (isRefilling) return;
+
+  const bite = rnd(1.2, 6.5);
+  vol      = Math.max(0.2, vol - bite);
+  absorbed += bite;
+  cvd      += bite * rnd(0.8, 1.1);
+
+  spawnArrow(bite);
+  updateDisplay();
+
+  if (vol <= ICE_CRIT) {
+    setTimeout(doRefill, 180);
+  }
+}
+
+setInterval(drainTick, DRAIN_MS);
+updateDisplay();
+</script>
+</body>
+</html>
