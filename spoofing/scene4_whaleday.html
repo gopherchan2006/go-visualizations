@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>День из жизни кита</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body { background:#020304; display:flex; justify-content:center; align-items:center; min-height:100vh; font-family:'Inter',sans-serif; }
+.frame { width:540px; height:960px; position:relative; overflow:hidden; background:#07080e; border:1px solid rgba(255,255,255,0.06); border-radius:4px; box-shadow:0 0 80px rgba(0,0,0,0.95); }
+canvas { position:absolute; top:0; left:0; }
+</style>
+</head>
+<body>
+<div class="frame"><canvas id="c" width="540" height="960"></canvas></div>
+<script>
+'use strict';
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const W = 540, H = 960, CX = 270;
+
+// ── Layout ──
+const TOP = 66, BOT = 874;
+const LX  = 10, LW = CX - 8 - LX;            // left: x=10, w=252
+const RX  = CX + 8, RW = W - RX - 10;         // right: x=278, w=252
+
+const BTN_H = 46, BTN_W = LW;
+const BTN1_Y = TOP + 10;                        // 76  – FAKE BID
+const BTN2_Y = BTN1_Y + BTN_H + 8;             // 130 – CANCEL
+const BTN3_Y = BTN2_Y + BTN_H + 8;             // 184 – SELL
+
+const L_LOG_Y  = BTN3_Y + BTN_H + 12;          // 242
+const L_LOG_H  = 100;
+const L_OB_Y   = L_LOG_Y + L_LOG_H + 10;       // 352
+const L_OB_H   = 174;
+const L_CHT_Y  = L_OB_Y + L_OB_H + 10;        // 536
+const L_CHT_H  = 218;
+const L_PNL_Y  = L_CHT_Y + L_CHT_H + 10;      // 764   (764+76=840 < 874 ✓)
+
+const R_EMO_Y  = TOP + 10;                     // 76
+const R_OB_Y   = R_EMO_Y + 32 + 8;            // 116
+const R_OB_H   = 148;
+const R_POS_Y  = R_OB_Y + R_OB_H + 10;        // 274
+const R_POS_H  = 116;
+const R_CHT_Y  = R_POS_Y + R_POS_H + 10;      // 400
+const R_CHT_H  = 264;
+const R_LOG_Y  = R_CHT_Y + R_CHT_H + 10;      // 674
+const R_BAL_Y  = R_LOG_Y + 96 + 10;            // 780  (780+62=842 < 874 ✓)
+
+// ── Cycle / Phases ──
+const CYCLE   = 920;
+const PH_HUNT = 0.08;   // whale scans
+const PH_WALL = 0.17;   // fake wall placed
+const PH_FULL = 0.30;   // wall built, price rising
+const PH_BUY  = 0.38;   // trader buys (FOMO)
+const PH_PEAK = 0.54;   // price at peak
+const PH_CNCL = 0.57;   // whale cancels
+const PH_SELL = 0.63;   // whale sells
+const PH_CRSH = 0.81;   // crash ends
+const PH_RSLT = 0.87;   // result
+
+const P_BASE  = 65230;
+const P_PEAK_V = 65402;
+const P_CRASH_V= 65042;
+
+// ── Helpers ──
+function rnd(a,b)  { return a + Math.random()*(b-a); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function sm(t)  { const c=Math.min(1,Math.max(0,t)); return c*c*(3-2*c); }
+function eo(t)  { const c=Math.min(1,Math.max(0,t)); return 1-(1-c)*(1-c); }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+function getPrice(f) {
+  const t = (f % CYCLE) / CYCLE;
+  const n = Math.sin(f*0.09)*1.8 + Math.cos(f*0.17)*0.9;
+  if (t < PH_HUNT)  return P_BASE + n;
+  if (t < PH_WALL)  return P_BASE + n*1.3;
+  if (t < PH_FULL) {
+    const p = sm((t-PH_WALL)/(PH_FULL-PH_WALL));
+    return lerp(P_BASE, P_BASE+38, p) + n;
+  }
+  if (t < PH_PEAK) {
+    const p = sm((t-PH_FULL)/(PH_PEAK-PH_FULL));
+    return lerp(P_BASE+38, P_PEAK_V, p) + n;
+  }
+  if (t < PH_CNCL) return P_PEAK_V + n*0.4;
+  if (t < PH_SELL) {
+    const p = (t-PH_CNCL)/(PH_SELL-PH_CNCL);
+    return lerp(P_PEAK_V, P_PEAK_V-16, p) + n;
+  }
+  if (t < PH_CRSH) {
+    const p = eo((t-PH_SELL)/(PH_CRSH-PH_SELL));
+    return lerp(P_PEAK_V-16, P_CRASH_V, p) + n;
+  }
+  return lerp(P_CRASH_V, P_CRASH_V+30, (t-PH_CRSH)/(1-PH_CRSH)) + n;
+}
+
+// ── State ──
+let frameN = 0, lastCy = -1;
+let wallPlacedCy = -1, cancelFiredCy = -1, sellFiredCy = -1, traderBoughtCy = -1, crashFiredCy = -1;
+
+let whaleBal = 800000, whaleProfit = 0, whaleProfitDisp = 0;
+let traderBal = 10000, traderBTC = 0, traderEntry = 0, traderPnL = 0, traderLossDisp = 0;
+
+// Buttons: state 0=hidden,1=idle,2=hover,3=pressing,4=done
+let b1s=0,b1a=0, b2s=0,b2a=0, b3s=0,b3a=0;
+// Cursor
+let cur = { x: LX+LW*0.5, y: L_OB_Y+60, tx: LX+LW*0.5, ty: L_OB_Y+60, clk:0, vis:0 };
+// Effects
+let parts=[], sparks=[], rings=[], floatNums=[], flashes=[], ltns=[];
+let shakeAmt=0, screenFlash=0;
+// Logs
+let whaleLogs=[], traderLogs=[];
+// Price history
+const N_HIST = 252;
+let priceHist = new Array(N_HIST).fill(P_BASE);
+// BG
+let bgDots = [];
+for(let i=0;i<32;i++) bgDots.push({x:rnd(0,W),y:rnd(0,H),vx:rnd(-0.04,0.04),vy:rnd(-0.04,0.04),r:rnd(0.3,1.5),a:rnd(0.012,0.04),col:i<16?'#32dc82':'#ff5c5c'});
+
+// ── Log helper ──
+function addLog(side, text, col) {
+  const arr = side==='w' ? whaleLogs : traderLogs;
+  arr.push({ text, col, life:1 });
+  if (arr.length > 4) arr.splice(0, arr.length-4);
+}
+
+// ── Lightning ──
+function drawLtn(x1,y1,x2,y2,col,a,w) {
+  const pts=[{x:x1,y:y1}];
+  for(let i=1;i<6;i++){const tt=i/6;pts.push({x:lerp(x1,x2,tt)+rnd(-14,14),y:lerp(y1,y2,tt)+rnd(-9,9)});}
+  pts.push({x:x2,y:y2});
+  ctx.save();ctx.globalAlpha=Math.max(0,a);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.shadowColor=col;ctx.shadowBlur=12;
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.stroke();
+  ctx.strokeStyle='#ffffff';ctx.lineWidth=w*0.28;ctx.shadowBlur=4;
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.stroke();
+  ctx.restore();
+}
+
+// ── Trigger effects ──
+function triggerCancel() {
+  shakeAmt=10; screenFlash=1.1;
+  const bx=LX+LW*0.5, by=BTN2_Y+BTN_H*0.5;
+  flashes.push({x:bx,y:by,life:1,col:'#ff5c5c'});
+  for(let i=0;i<52;i++){
+    const a2=rnd(0,Math.PI*2),s=rnd(3,15);
+    parts.push({x:bx+rnd(-20,20),y:by+rnd(-10,10),vx:Math.cos(a2)*s,vy:Math.sin(a2)*s,r:rnd(2,7),life:1,col:i<28?'#ff5c5c':'#f5c842'});
+  }
+  for(let i=0;i<16;i++){
+    const a2=rnd(0,Math.PI*2);
+    sparks.push({x:bx,y:by,vx:Math.cos(a2)*rnd(6,20),vy:Math.sin(a2)*rnd(6,20),life:1,len:rnd(12,32),col:'#ff5c5c'});
+  }
+  rings.push({x:bx,y:by,r:4,maxR:240,life:1,col:'#ff5c5c',thick:true});
+  rings.push({x:RX+RW*0.5,y:R_OB_Y+90,r:4,maxR:160,life:1,col:'#ff5c5c',thick:false});
+  for(let i=0;i<4;i++) ltns.push({x1:bx,y1:by,x2:bx+rnd(-80,80),y2:by+rnd(-140,60),life:1.0,col:i%2===0?'#ff5c5c':'#f5c842'});
+  floatNums.push({x:bx,y:by-10,text:'ОТМЕНЁН!',life:1.5,vy:-1.8,col:'#ff5c5c',big:true});
+  addLog('w','09:15:08  CANCEL 8,540 @ 65,200 ✓','#ff5c5c');
+  addLog('t','09:15:08  ??? Стена исчезла!','#f5c842');
+}
+
+function triggerSell() {
+  shakeAmt=12; screenFlash=1.4;
+  const bx=LX+LW*0.5, by=BTN3_Y+BTN_H*0.5;
+  flashes.push({x:bx,y:by,life:1.2,col:'#32dc82'});
+  for(let i=0;i<68;i++){
+    const a2=rnd(-Math.PI*0.85,0.1),s=rnd(4,20);
+    parts.push({x:bx+rnd(-24,24),y:by,vx:Math.cos(a2)*s,vy:Math.sin(a2)*s-rnd(1,3),r:rnd(2.5,9),life:1,col:i<46?'#32dc82':i<56?'#f5c842':'#00ffaa'});
+  }
+  for(let i=0;i<22;i++){
+    const a2=rnd(-Math.PI*0.9,0.2);
+    sparks.push({x:bx,y:by,vx:Math.cos(a2)*rnd(8,26),vy:Math.sin(a2)*rnd(6,22),life:1,len:rnd(14,42),col:i%2===0?'#32dc82':'#f5c842'});
+  }
+  rings.push({x:bx,y:by,r:4,maxR:310,life:1,col:'#32dc82',thick:true});
+  for(let i=1;i<=4;i++) setTimeout(()=>rings.push({x:bx,y:by,r:4,maxR:60+i*70,life:1,col:i%2===0?'#f5c842':'#32dc82',thick:false}),i*110);
+  for(let i=0;i<6;i++) ltns.push({x1:bx,y1:by,x2:bx+rnd(-100,100),y2:by-rnd(80,240),life:1.2,col:i<3?'#32dc82':'#f5c842'});
+  const p = Math.round(whaleProfit);
+  floatNums.push({x:bx,y:by-16,text:'+$'+p.toLocaleString(),life:1.8,vy:-1.6,col:'#32dc82',big:true});
+  addLog('w','09:15:10  SELL 142 BTC @ 65,390 ✓','#32dc82');
+  setTimeout(()=>addLog('w','09:15:12  Профит: +$'+p.toLocaleString(),'#32dc82'),600);
+}
+
+function triggerCrash() {
+  shakeAmt=8;
+  for(let i=0;i<36;i++){
+    const a2=rnd(0,Math.PI), s=rnd(2,10);
+    parts.push({x:RX+rnd(20,RW-20),y:R_CHT_Y+rnd(40,R_CHT_H-40),vx:Math.cos(a2)*s,vy:Math.sin(a2)*s,r:rnd(1.5,5),life:1,col:'#ff5c5c'});
+  }
+  rings.push({x:RX+RW*0.5,y:R_CHT_Y+R_CHT_H*0.5,r:4,maxR:200,life:1,col:'#ff5c5c',thick:false});
+  floatNums.push({x:RX+RW*0.5,y:R_CHT_Y+80,text:'СТОП-ЛОСС!',life:1.6,vy:-1.4,col:'#ff5c5c',big:true});
+  const loss = Math.round(Math.abs(traderPnL));
+  setTimeout(()=>floatNums.push({x:RX+RW*0.5,y:R_CHT_Y+110,text:'-$'+loss.toLocaleString(),life:1.5,vy:-1.2,col:'#ff5c5c',big:false}),400);
+  addLog('t','09:15:14  STOP-LOSS: -8 BTC @ 65,082','#ff5c5c');
+  setTimeout(()=>addLog('t','09:15:14  Убыток: -$'+loss.toLocaleString(),'rgba(255,92,92,0.6)'),500);
+}
+
+// ── Orderbook data ──
+const ASK_ROWS = [
+  {price:65440,size:24.2},{price:65410,size:48.7},{price:65370,size:19.4}
+];
+const BID_ROWS = [
+  {price:65230,size:14.6},{price:65210,size:61.3}
+];
+const FAKE_PRICE = 65200;
+const FAKE_SIZE  = 8540;
+
+// ── Update ──
+function update() {
+  frameN++;
+  const cf = frameN % CYCLE;
+  const ci = Math.floor(frameN / CYCLE);
+  const t  = cf / CYCLE;
+  const price = getPrice(frameN);
+
+  priceHist.push(price); priceHist.shift();
+
+  // ── Reset cycle ──
+  if (ci !== lastCy) {
+    lastCy = ci;
+    wallPlacedCy=cancelFiredCy=sellFiredCy=traderBoughtCy=crashFiredCy=-1;
+    b1s=0;b1a=0; b2s=0;b2a=0; b3s=0;b3a=0;
+    traderBTC=0; traderEntry=0; traderPnL=0; traderLossDisp=0;
+    whaleBal=800000; whaleProfit=0; whaleProfitDisp=0;
+    traderBal=10000;
+    whaleLogs=[]; traderLogs=[];
+    cur.vis=0;
+  }
+
+  // ── Phase state machine ──
+  const wallGrow = t < PH_WALL ? 0 : t < PH_FULL ? sm((t-PH_WALL)/(PH_FULL-PH_WALL)) : t < PH_CNCL ? 1 : 0;
+  const wallOn   = t >= PH_WALL && t < PH_CNCL;
+
+  // Buttons appear
+  if (t >= PH_HUNT && b1s===0) { b1s=1; cur.vis=1; }
+  if (t >= PH_FULL && b2s===0) { b2s=1; }
+  if (t >= PH_FULL && b3s===0) { b3s=1; }
+
+  // Cursor target
+  if (t >= PH_HUNT && t < PH_WALL) {
+    cur.tx = LX + BTN_W*0.5; cur.ty = BTN1_Y + BTN_H*0.5;
+    b1s = 2; // hover
+  } else if (t >= PH_WALL && t < PH_FULL) {
+    cur.tx = LX + BTN_W*0.5; cur.ty = BTN1_Y + BTN_H*0.5;
+    b1s = 4; // done
+  } else if (t >= PH_PEAK && t < PH_CNCL) {
+    cur.tx = LX + BTN_W*0.5; cur.ty = BTN2_Y + BTN_H*0.5;
+    b2s = 2; // hover
+  } else if (t >= PH_CNCL && t < PH_SELL) {
+    cur.tx = LX + BTN_W*0.5; cur.ty = BTN3_Y + BTN_H*0.5;
+    b2s = 4;
+    b3s = 2; // hover
+  } else if (t >= PH_SELL) {
+    cur.tx = LX + LW*0.5; cur.ty = L_PNL_Y + 34;
+    b3s = 4;
+  } else if (t >= PH_FULL && t < PH_PEAK) {
+    cur.tx = LX + LW*0.6; cur.ty = L_OB_Y + 100;
+  }
+  cur.x += (cur.tx - cur.x) * 0.055;
+  cur.y += (cur.ty - cur.y) * 0.055;
+  cur.clk = Math.max(0, cur.clk - 0.08);
+
+  // ── One-time events ──
+  if (t >= PH_WALL && wallPlacedCy !== ci) {
+    wallPlacedCy = ci;
+    b1s = 3; b1a = 0; cur.clk = 1;
+    addLog('w','09:14:03  BID 8,540 @ 65,200 PLACED','#f5c842');
+    addLog('t','09:14:03  Огромный bid! Сильная поддержка','rgba(50,220,130,0.7)');
+  }
+  if (t >= PH_BUY && traderBoughtCy !== ci) {
+    traderBoughtCy = ci;
+    traderBTC   = 8;
+    traderEntry = price;
+    traderBal   = 10000;
+    addLog('t','09:14:40  Покупаю! BUY 8 BTC @ '+Math.round(traderEntry),'#32dc82');
+    floatNums.push({x:RX+RW*0.5,y:R_POS_Y+30,text:'КУПИЛ!',life:1.2,vy:-1.2,col:'#32dc82',big:false});
+    rings.push({x:RX+RW*0.5,y:R_POS_Y+60,r:4,maxR:90,life:1,col:'#32dc82',thick:false});
+  }
+  if (t >= PH_CNCL && cancelFiredCy !== ci) {
+    cancelFiredCy = ci;
+    triggerCancel();
+    b2s = 3; b2a = 0; cur.clk = 1;
+  }
+  if (t >= PH_SELL && sellFiredCy !== ci) {
+    sellFiredCy = ci;
+    whaleProfit = 142 * (P_PEAK_V - P_BASE + 20);
+    whaleBal    = 800000 + whaleProfit;
+    triggerSell();
+    b3s = 3; b3a = 0; cur.clk = 1;
+  }
+  if (t >= PH_CRSH && crashFiredCy !== ci) {
+    crashFiredCy = ci;
+    triggerCrash();
+  }
+
+  // ── Live values ──
+  if (traderBTC > 0) {
+    traderPnL = traderBTC * (price - traderEntry);
+    if (t < PH_CRSH) traderBal = 10000 + traderPnL;
+    else {
+      const loss = traderBTC * (P_CRASH_V + 40 - traderEntry);
+      traderBal = Math.max(0, 10000 + loss);
+      traderLossDisp = -loss;
+    }
+  }
+  whaleProfitDisp += (whaleProfit - whaleProfitDisp) * 0.04;
+
+  // Button press anim
+  b1a = Math.min(1, b1a + (b1s===3?0.09:0)); if(b1s===3&&b1a>=1) b1s=4;
+  b2a = Math.min(1, b2a + (b2s===3?0.09:0)); if(b2s===3&&b2a>=1) b2s=4;
+  b3a = Math.min(1, b3a + (b3s===3?0.09:0)); if(b3s===3&&b3a>=1) b3s=4;
+
+  // Decay
+  if(shakeAmt>0){shakeAmt*=0.72;if(shakeAmt<0.2)shakeAmt=0;}
+  if(screenFlash>0) screenFlash=Math.max(0,screenFlash-0.04);
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vx*=0.91;p.vy*=0.91;p.life-=0.024;if(p.life<=0)parts.splice(i,1);}
+  for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.x+=s.vx;s.y+=s.vy;s.vx*=0.88;s.vy*=0.88;s.life-=0.034;if(s.life<=0)sparks.splice(i,1);}
+  for(let i=rings.length-1;i>=0;i--){const r=rings[i];r.r+=(r.maxR-r.r)*0.082;r.life-=0.022;if(r.life<=0)rings.splice(i,1);}
+  for(let i=flashes.length-1;i>=0;i--){flashes[i].life-=0.05;if(flashes[i].life<=0)flashes.splice(i,1);}
+  for(let i=ltns.length-1;i>=0;i--){ltns[i].life-=0.11;if(ltns[i].life<=0)ltns.splice(i,1);}
+  for(let i=floatNums.length-1;i>=0;i--){const fn=floatNums[i];fn.y+=fn.vy;fn.vy*=0.97;fn.life-=0.016;if(fn.life<=0)floatNums.splice(i,1);}
+  for(const d of bgDots){d.x+=d.vx;d.y+=d.vy;if(d.x<0)d.x=W;if(d.x>W)d.x=0;if(d.y<0)d.y=H;if(d.y>H)d.y=0;}
+  for(const l of whaleLogs) l.life=Math.max(0.14,l.life-0.003);
+  for(const l of traderLogs) l.life=Math.max(0.14,l.life-0.003);
+}
+
+// ══════════ DRAW HELPERS ══════════
+
+function panel(x,y,w,h,r,bg,border) {
+  ctx.beginPath(); ctx.roundRect(x,y,w,h,r);
+  if(bg){ctx.fillStyle=bg;ctx.fill();}
+  if(border){ctx.strokeStyle=border;ctx.lineWidth=1;ctx.stroke();}
+}
+
+function label(txt,x,y,font,col,align,base,glow) {
+  ctx.font=font; ctx.textAlign=align||'left'; ctx.textBaseline=base||'top';
+  if(glow){ctx.shadowColor=col;ctx.shadowBlur=glow;}
+  ctx.fillStyle=col; ctx.fillText(txt,x,y);
+  ctx.shadowBlur=0;
+}
+
+function drawButton(bx,by,bw,bh,txt,state,anim,col) {
+  if(state===0) return;
+  const hx=col.slice(1);
+  const rr=parseInt(hx.slice(0,2),16), gg=parseInt(hx.slice(2,4),16), bb=parseInt(hx.slice(4,6),16);
+  const pulse=0.6+0.4*Math.sin(frameN*0.14);
+  const isHover=(state===2), isPress=(state===3), isDone=(state===4);
+  const bgA  = isHover?0.20*pulse:isPress?0.30:isDone?0.07:0.07;
+  const brdA = isHover?0.7*pulse:isPress?1.0:isDone?0.12:0.18;
+  const textA= isHover?0.95*pulse:isPress?1.0:isDone?0.2:0.35;
+  const sc   = isPress?(1-anim*0.045):1;
+
+  ctx.save();
+  ctx.translate(bx+bw*0.5,by+bh*0.5); ctx.scale(sc,sc); ctx.translate(-(bx+bw*0.5),-(by+bh*0.5));
+  if(isHover||isPress){ctx.shadowColor=col;ctx.shadowBlur=16*pulse;}
+  ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,8);
+  ctx.fillStyle=`rgba(${rr},${gg},${bb},${bgA})`; ctx.fill();
+  ctx.strokeStyle=`rgba(${rr},${gg},${bb},${brdA})`; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.font='800 11px Inter'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=`rgba(${rr},${gg},${bb},${textA})`;
+  if(!isDone){ctx.shadowColor=col;ctx.shadowBlur=8*pulse;}
+  ctx.fillText(txt,bx+bw*0.5,by+bh*0.5); ctx.shadowBlur=0;
+  if(isPress&&anim>0){
+    ctx.beginPath();ctx.arc(bx+bw*0.5,by+bh*0.5,anim*(bw*0.55),0,Math.PI*2);
+    ctx.strokeStyle=`rgba(${rr},${gg},${bb},${(1-anim)*0.5})`;ctx.lineWidth=2;ctx.stroke();
+  }
+  if(isDone){
+    ctx.strokeStyle=`rgba(${rr},${gg},${bb},0.12)`;ctx.lineWidth=1.4;ctx.setLineDash([3,4]);
+    ctx.beginPath();ctx.moveTo(bx+10,by+bh*0.5);ctx.lineTo(bx+bw-10,by+bh*0.5);ctx.stroke();ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+// ══════════ DRAW: LEFT (WHALE) ══════════
+
+function drawWhale() {
+  const cf = frameN % CYCLE, t = cf / CYCLE;
+  const wallGrow = t < PH_WALL ? 0 : t < PH_FULL ? sm((t-PH_WALL)/(PH_FULL-PH_WALL)) : t < PH_CNCL ? 1 : 0;
+  const pulse = 0.6 + 0.4*Math.sin(frameN*0.12);
+  const inProfit = t >= PH_SELL;
+
+  // Side bg tint (subtle green)
+  const bg = ctx.createLinearGradient(0,TOP,CX,TOP);
+  bg.addColorStop(0,`rgba(8,26,14,${0.4+wallGrow*0.2})`); bg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=bg; ctx.fillRect(0,TOP,CX,BOT-TOP);
+
+  // ── Whale status header ──
+  panel(LX,R_EMO_Y,LW,26,6,'rgba(8,22,12,0.9)','rgba(50,220,130,0.1)');
+  const whaleStatus =
+    t < PH_HUNT  ? 'МОНИТОРИНГ...' :
+    t < PH_WALL  ? '● НАШЁЛ ЦЕЛЬ — BTC/USDT' :
+    t < PH_CNCL  ? '● ЛОВУШКА АКТИВНА' :
+    t < PH_SELL  ? '● ОТМЕНЯЮ ЗАЯВКУ...' :
+    t < PH_CRSH  ? '▲ ПРОДАЮ НА ПИКЕ' : '✓ ПРОФИТ ЗАФИКСИРОВАН';
+  const wsCol =
+    t < PH_HUNT  ? 'rgba(50,220,130,0.28)' :
+    t < PH_CNCL  ? 'rgba(50,220,130,0.7)' :
+    t < PH_SELL  ? 'rgba(255,92,92,0.7)' : '#32dc82';
+  label(whaleStatus,LX+8,R_EMO_Y+7,'700 9px Inter',wsCol,'left','top',inProfit?8:0);
+
+  // ── Buttons ──
+  drawButton(LX,BTN1_Y,BTN_W,BTN_H,'⚡  FAKE BID  8,540 BTC  @65,200',b1s,b1a,'#f5c842');
+  drawButton(LX,BTN2_Y,BTN_W,BTN_H,'✕  CANCEL ORDER  8,540 BTC',b2s,b2a,'#ff5c5c');
+  drawButton(LX,BTN3_Y,BTN_W,BTN_H,'▼  SELL  142 BTC  @MARKET',b3s,b3a,'#ff9030');
+
+  // ── Cursor ──
+  if(cur.vis) {
+    const cp = 0.5 + 0.5*Math.sin(frameN*0.2) + cur.clk * 0.5;
+    ctx.beginPath(); ctx.arc(cur.x,cur.y,5+cur.clk*10,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(50,220,130,${(0.4+cur.clk*0.5)*cp})`;ctx.lineWidth=1.5;ctx.stroke();
+    ctx.beginPath(); ctx.arc(cur.x,cur.y,2.5,0,Math.PI*2);
+    ctx.fillStyle='#32dc82'; ctx.shadowColor='#32dc82'; ctx.shadowBlur=8+cur.clk*12;
+    ctx.fill(); ctx.shadowBlur=0;
+  }
+
+  // ── Order log ──
+  panel(LX,L_LOG_Y,LW,L_LOG_H,8,'rgba(5,12,8,0.9)','rgba(50,220,130,0.07)');
+  label('ЛОГ ОРДЕРОВ',LX+8,L_LOG_Y+7,'700 8px Inter','rgba(50,220,130,0.22)','left','top');
+  const logY0 = L_LOG_Y + 22;
+  // Default static entries that appear early
+  const defaultLogs = [
+    {text:'09:12:44  Анализирую BTC/USDT...', col:'rgba(238,240,248,0.18)'},
+    {text:'09:13:51  Низкая ликвидность. Цель.', col:'rgba(238,240,248,0.18)'},
+  ];
+  const allLogs = t < PH_WALL
+    ? defaultLogs.slice(0, Math.ceil(defaultLogs.length * clamp((t-0.02)/0.10, 0, 1)))
+    : whaleLogs;
+  for(let i=0;i<Math.min(4,allLogs.length);i++) {
+    const e = allLogs[allLogs.length-1-i];
+    if(!e) continue;
+    const a = e.life || 1;
+    ctx.font='600 9px JetBrains Mono'; ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle=typeof e.col==='string'?e.col.replace('1)',''+a+')'):`rgba(238,240,248,${a*0.55})`;
+    ctx.globalAlpha=clamp(a,0,1);
+    ctx.fillText(e.text, LX+8, logY0+(3-i)*18);
+    ctx.globalAlpha=1;
+  }
+
+  // ── Orderbook (whale sees FAKE label) ──
+  panel(LX,L_OB_Y,LW,L_OB_H,8,'rgba(5,12,8,0.92)','rgba(50,220,130,0.07)');
+  label('ORDERBOOK',LX+8,L_OB_Y+7,'700 8px Inter','rgba(50,220,130,0.22)','left','top');
+  label('ОБЪЁМ BTC',LX+LW-8,L_OB_Y+7,'700 8px Inter','rgba(238,240,248,0.12)','right','top');
+
+  let oy = L_OB_Y + 22;
+  const ROW_H = 26;
+  // Ask rows
+  for(const row of ASK_ROWS) {
+    const bw = (row.size/70)*LW*0.55;
+    ctx.fillStyle='rgba(255,92,92,0.06)'; ctx.fillRect(LX+LW-8-bw,oy,bw,ROW_H-2);
+    label(row.price.toLocaleString(),LX+6,oy+ROW_H*0.5,'600 11px JetBrains Mono','rgba(255,92,92,0.5)','left','middle');
+    label(row.size.toFixed(1),LX+LW-6,oy+ROW_H*0.5,'600 11px JetBrains Mono','rgba(238,240,248,0.2)','right','middle');
+    oy += ROW_H;
+  }
+  // Spread
+  ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=1;ctx.setLineDash([4,6]);
+  ctx.beginPath();ctx.moveTo(LX+6,oy+4);ctx.lineTo(LX+LW-6,oy+4);ctx.stroke();ctx.setLineDash([]);
+  oy += 10;
+  // Fake bid row (whale sees it as FAKE)
+  if(wallGrow > 0.01) {
+    const fakeSize = Math.round(FAKE_SIZE * wallGrow);
+    const fBW = (fakeSize/FAKE_SIZE)*LW*0.85;
+    const fp = 0.55 + 0.45*Math.sin(frameN*0.16);
+    ctx.fillStyle=`rgba(245,200,66,${0.13*fp})`;ctx.fillRect(LX,oy,LW,ROW_H+4);
+    ctx.fillStyle=`rgba(245,200,66,${0.22*wallGrow})`;ctx.fillRect(LX+4,oy+3,fBW,ROW_H-2);
+    ctx.strokeStyle=`rgba(245,200,66,${0.45*fp})`;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.roundRect(LX+2,oy+1,LW-4,ROW_H+2,4);ctx.stroke();
+    label(FAKE_PRICE.toLocaleString(),LX+6,oy+(ROW_H+4)*0.5,'800 11px JetBrains Mono',`rgba(245,200,66,${0.9*fp})`,'left','middle',6*fp);
+    label(fakeSize.toLocaleString(),LX+LW-6,oy+(ROW_H+4)*0.5,'700 11px JetBrains Mono',`rgba(245,200,66,${0.9*wallGrow})`,'right','middle');
+    // FAKE badge
+    ctx.font='800 8px Inter';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=`rgba(245,200,66,${fp*wallGrow})`;ctx.shadowColor='#f5c842';ctx.shadowBlur=6;
+    ctx.fillText('⚠ FAKE ORDER',LX+LW*0.5,oy+(ROW_H+4)*0.5-8);ctx.shadowBlur=0;
+    oy += ROW_H + 10;
+  } else { oy += 4; }
+  // Bid rows
+  for(const row of BID_ROWS) {
+    const bw = (row.size/80)*LW*0.55;
+    ctx.fillStyle='rgba(50,220,130,0.06)';ctx.fillRect(LX+4,oy,bw,ROW_H-2);
+    label(row.price.toLocaleString(),LX+6,oy+ROW_H*0.5,'600 11px JetBrains Mono','rgba(50,220,130,0.45)','left','middle');
+    label(row.size.toFixed(1),LX+LW-6,oy+ROW_H*0.5,'600 11px JetBrains Mono','rgba(238,240,248,0.2)','right','middle');
+    oy += ROW_H;
+  }
+
+  // ── Whale chart ──
+  drawChart(LX, L_CHT_Y, LW, L_CHT_H, 'whale', t);
+
+  // ── PnL ──
+  const profitDisp = Math.round(whaleProfitDisp);
+  const pnlBg = profitDisp > 100 ? 'rgba(8,30,14,0.9)' : 'rgba(5,12,8,0.9)';
+  const pnlBrd = profitDisp > 100 ? 'rgba(50,220,130,0.25)' : 'rgba(50,220,130,0.06)';
+  panel(LX, L_PNL_Y, LW, 72, 8, pnlBg, pnlBrd);
+  label('БАЛАНС',LX+8,L_PNL_Y+8,'700 8px Inter','rgba(238,240,248,0.2)','left','top');
+  label('ПРОФИТ',LX+LW-8,L_PNL_Y+8,'700 8px Inter','rgba(50,220,130,0.2)','right','top');
+  const balStr = '$' + Math.round(whaleBal).toLocaleString();
+  const pftStr = (profitDisp>=0?'+':'')+' $' + profitDisp.toLocaleString();
+  const pftCol = profitDisp > 100 ? '#32dc82' : 'rgba(238,240,248,0.25)';
+  label(balStr,LX+8,L_PNL_Y+40,'900 20px Inter','#eef0f8','left','middle',profitDisp>100?6:0);
+  label(pftStr,LX+LW-8,L_PNL_Y+40,'900 22px Inter',pftCol,'right','middle',profitDisp>100?12:0);
+}
+
+// ══════════ DRAW: RIGHT (TRADER) ══════════
+
+function drawTrader() {
+  const cf = frameN % CYCLE, t = cf / CYCLE;
+  const wallGrow = t < PH_WALL ? 0 : t < PH_FULL ? sm((t-PH_WALL)/(PH_FULL-PH_WALL)) : t < PH_CNCL ? 1 : 0;
+  const pulse = 0.6 + 0.4*Math.sin(frameN*0.12);
+  const inCrash = t >= PH_CRSH;
+  const inFOMO  = t >= PH_BUY && t < PH_CNCL;
+  const inLoss  = t >= PH_CNCL;
+
+  // Side bg tint (shifts red during crash)
+  if(inCrash) {
+    const bg = ctx.createLinearGradient(CX,TOP,W,TOP);
+    bg.addColorStop(0,'rgba(0,0,0,0)'); bg.addColorStop(1,`rgba(26,6,6,${clamp((t-PH_CRSH)*4,0,0.45)})`);
+    ctx.fillStyle=bg; ctx.fillRect(CX,TOP,CX,BOT-TOP);
+  }
+
+  // ── Emotion status ──
+  const emoStates = [
+    {t:0,       txt:'○ НЕЙТРАЛЬНО', col:'rgba(238,240,248,0.2)'},
+    {t:PH_WALL, txt:'● ВИЖУ БОЛЬШОЙ СПРОС!', col:'rgba(50,220,130,0.6)'},
+    {t:PH_BUY,  txt:'▲ КУПИЛ — ЖДУ РОСТА', col:'rgba(50,220,130,0.85)'},
+    {t:PH_CNCL, txt:'? ЧТО ПРОИСХОДИТ?!', col:'rgba(245,200,66,0.9)'},
+    {t:PH_CRSH, txt:'⚠ ПАНИКА — СТОП-ЛОСС', col:'#ff5c5c'},
+  ];
+  let emoIdx=0;
+  for(let i=0;i<emoStates.length;i++) if(t>=emoStates[i].t) emoIdx=i;
+  const emo = emoStates[emoIdx];
+
+  panel(RX,R_EMO_Y,RW,26,6,'rgba(8,9,15,0.9)','rgba(255,255,255,0.05)');
+  label(emo.txt, RX+8, R_EMO_Y+7, '700 9px Inter', emo.col, 'left', 'top', emoIdx>=3?8:0);
+
+  // ── Trader's orderbook (they DON'T see FAKE — looks like real support) ──
+  panel(RX,R_OB_Y,RW,R_OB_H,8,'rgba(8,9,15,0.92)','rgba(255,255,255,0.05)');
+  label('КНИГА ЗАЯВОК',RX+8,R_OB_Y+7,'700 8px Inter','rgba(238,240,248,0.18)','left','top');
+  label('ОБЪЁМ BTC',RX+RW-8,R_OB_Y+7,'700 8px Inter','rgba(238,240,248,0.1)','right','top');
+
+  let oy2 = R_OB_Y + 22;
+  const ROW_H = 24;
+  for(const row of ASK_ROWS) {
+    const bw=(row.size/70)*RW*0.5;
+    ctx.fillStyle='rgba(255,92,92,0.055)';ctx.fillRect(RX+RW-6-bw,oy2,bw,ROW_H-2);
+    label(row.price.toLocaleString(),RX+6,oy2+ROW_H*0.5,'600 10px JetBrains Mono','rgba(255,92,92,0.45)','left','middle');
+    label(row.size.toFixed(1),RX+RW-6,oy2+ROW_H*0.5,'600 10px JetBrains Mono','rgba(238,240,248,0.18)','right','middle');
+    oy2 += ROW_H;
+  }
+  ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=1;ctx.setLineDash([3,5]);
+  ctx.beginPath();ctx.moveTo(RX+6,oy2+3);ctx.lineTo(RX+RW-6,oy2+3);ctx.stroke();ctx.setLineDash([]);
+  oy2 += 8;
+  // Fake wall — trader sees it as GREEN support
+  if(wallGrow > 0.01) {
+    const fakeSize = Math.round(FAKE_SIZE * wallGrow);
+    const fBW = (fakeSize/FAKE_SIZE)*RW*0.85;
+    const fp = 0.55 + 0.45*Math.sin(frameN*0.16);
+    ctx.fillStyle=`rgba(50,220,130,${0.10*fp})`;ctx.fillRect(RX,oy2,RW,ROW_H+4);
+    ctx.fillStyle=`rgba(50,220,130,${0.2*wallGrow})`;ctx.fillRect(RX+4,oy2+3,fBW,ROW_H-2);
+    ctx.strokeStyle=`rgba(50,220,130,${0.35*fp})`;ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.roundRect(RX+2,oy2+1,RW-4,ROW_H+2,4);ctx.stroke();
+    label(FAKE_PRICE.toLocaleString(),RX+6,oy2+(ROW_H+4)*0.5,'700 10px JetBrains Mono',`rgba(50,220,130,${0.8*fp})`,'left','middle');
+    label(fakeSize.toLocaleString(),RX+RW-6,oy2+(ROW_H+4)*0.5,'700 10px JetBrains Mono',`rgba(50,220,130,${0.8*wallGrow})`,'right','middle');
+    ctx.font='700 8px Inter';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=`rgba(50,220,130,${fp*0.6*wallGrow})`; ctx.shadowColor='#32dc82'; ctx.shadowBlur=5;
+    ctx.fillText('← СИЛЬНАЯ ПОДДЕРЖКА', RX+RW*0.5, oy2+(ROW_H+4)*0.5-7); ctx.shadowBlur=0;
+    oy2 += ROW_H + 10;
+  }
+  for(const row of BID_ROWS) {
+    const bw=(row.size/80)*RW*0.5;
+    ctx.fillStyle='rgba(50,220,130,0.05)';ctx.fillRect(RX+4,oy2,bw,ROW_H-2);
+    label(row.price.toLocaleString(),RX+6,oy2+ROW_H*0.5,'600 10px JetBrains Mono','rgba(50,220,130,0.4)','left','middle');
+    label(row.size.toFixed(1),RX+RW-6,oy2+ROW_H*0.5,'600 10px JetBrains Mono','rgba(238,240,248,0.18)','right','middle');
+    oy2 += ROW_H;
+  }
+
+  // ── Position box ──
+  const price = getPrice(frameN);
+  const posBG  = inCrash ? 'rgba(20,6,6,0.9)' : traderPnL>0 ? 'rgba(6,20,10,0.9)' : 'rgba(8,9,15,0.9)';
+  const posBrd = inCrash ? 'rgba(255,92,92,0.3)' : traderPnL>0 ? 'rgba(50,220,130,0.18)' : 'rgba(255,255,255,0.05)';
+  panel(RX,R_POS_Y,RW,R_POS_H,8,posBG,posBrd);
+  label('ПОЗИЦИЯ',RX+8,R_POS_Y+8,'700 8px Inter','rgba(238,240,248,0.2)','left','top');
+
+  if(traderBTC > 0) {
+    const liveBalance = traderBal.toFixed(2);
+    const livePnL     = traderPnL.toFixed(2);
+    const pnlCol = inCrash ? '#ff5c5c' : traderPnL > 0 ? '#32dc82' : '#ff5c5c';
+    label((traderPnL>=0?'+':'')+'$'+livePnL, RX+8, R_POS_Y+46, '900 22px Inter', pnlCol, 'left','middle', inCrash?12:4);
+    label(traderBTC+' BTC  @  '+Math.round(traderEntry).toLocaleString(), RX+8, R_POS_Y+74, '600 10px JetBrains Mono', 'rgba(238,240,248,0.3)', 'left','middle');
+    const stTxt = inCrash ? '⚠ УБЫТОК' : traderPnL>0 ? '▲ В ПЛЮСЕ' : '▼ В МИНУСЕ';
+    const stCol = inCrash ? '#ff5c5c' : traderPnL>0 ? '#32dc82' : '#ff7070';
+    label(stTxt, RX+8, R_POS_Y+96, '700 9px Inter', stCol, 'left','middle', inCrash?10:4);
+    label('Баланс: $'+Number(liveBalance).toLocaleString('en',{maximumFractionDigits:0}), RX+RW-8, R_POS_Y+96,'600 9px Inter','rgba(238,240,248,0.2)','right','middle');
+  } else {
+    const msg = t < PH_WALL ? 'Ожидание сигнала...' : t < PH_BUY ? 'Вижу стену — готовлюсь!' : '—';
+    label(msg, RX+RW*0.5, R_POS_Y+R_POS_H*0.5,'700 10px Inter','rgba(238,240,248,0.15)','center','middle');
+  }
+
+  // ── Trader chart ──
+  drawChart(RX, R_CHT_Y, RW, R_CHT_H, 'trader', t);
+
+  // ── Trade log ──
+  panel(RX,R_LOG_Y,RW,96,8,'rgba(8,9,15,0.9)','rgba(255,255,255,0.04)');
+  label('ИСТОРИЯ СДЕЛОК',RX+8,R_LOG_Y+7,'700 8px Inter','rgba(238,240,248,0.18)','left','top');
+  const tDefLogs = t < PH_BUY
+    ? [{text:'Нет открытых сделок',col:'rgba(238,240,248,0.14)'}]
+    : traderLogs;
+  for(let i=0;i<Math.min(3,tDefLogs.length);i++){
+    const e=tDefLogs[tDefLogs.length-1-i];if(!e)continue;
+    ctx.font='600 9px JetBrains Mono';ctx.textAlign='left';ctx.textBaseline='top';
+    ctx.fillStyle=e.col||'rgba(238,240,248,0.4)';
+    ctx.globalAlpha=clamp(e.life||1,0,1); ctx.fillText(e.text,RX+8,R_LOG_Y+22+(2-i)*18); ctx.globalAlpha=1;
+  }
+
+  // ── Balance ──
+  const balLoss = traderLossDisp;
+  const balBg  = balLoss > 10 ? 'rgba(20,6,6,0.9)':'rgba(8,9,15,0.9)';
+  const balBrd = balLoss > 10 ? 'rgba(255,92,92,0.2)':'rgba(255,255,255,0.04)';
+  panel(RX,R_BAL_Y,RW,62,8,balBg,balBrd);
+  label('БАЛАНС',RX+8,R_BAL_Y+8,'700 8px Inter','rgba(238,240,248,0.2)','left','top');
+  const balStr2='$'+Math.round(traderBal).toLocaleString();
+  const balCol = traderBal < 9990 ? '#ff5c5c' : 'rgba(238,240,248,0.6)';
+  label(balStr2,RX+8,R_BAL_Y+40,'900 22px Inter',balCol,'left','middle',balLoss>10?8:0);
+  if(balLoss > 10) {
+    label('-$'+Math.round(balLoss).toLocaleString(),RX+RW-8,R_BAL_Y+40,'800 20px Inter','rgba(255,92,92,0.7)','right','middle',8);
+  }
+}
+
+// ══════════ DRAW: CHART (shared) ══════════
+
+function drawChart(cx, cy, cw, ch, side, t) {
+  const isW = side === 'whale';
+  const inCrash  = t >= PH_CRSH;
+  const inFOMO   = t >= PH_BUY && t < PH_CNCL;
+  const inProfit = t >= PH_SELL && t < PH_CRSH;
+
+  const P_MIN = 64980, P_MAX = 65460;
+  const pY = v => cy + ch - clamp((v-P_MIN)/(P_MAX-P_MIN),0,1)*ch;
+
+  panel(cx,cy,cw,ch,8,'rgba(5,8,12,0.95)','rgba(255,255,255,0.05)');
+  ctx.save(); ctx.beginPath(); ctx.roundRect(cx,cy,cw,ch,8); ctx.clip();
+
+  // Grid
+  for(let v=P_MIN;v<=P_MAX;v+=50){
+    ctx.beginPath();ctx.moveTo(cx,pY(v));ctx.lineTo(cx+cw,pY(v));
+    ctx.strokeStyle= v===P_BASE?'rgba(245,200,66,0.06)':'rgba(255,255,255,0.025)';ctx.lineWidth=0.8;
+    if(v===P_BASE)ctx.setLineDash([6,8]);ctx.stroke();ctx.setLineDash([]);
+  }
+  ctx.fillStyle='rgba(0,0,0,0.04)';for(let sy=cy;sy<cy+ch;sy+=3)ctx.fillRect(cx,sy,cw,1.2);
+
+  // Fill area under line
+  const n = Math.min(cw, priceHist.length);
+  ctx.beginPath();
+  for(let i=0;i<n;i++){const py=pY(priceHist[priceHist.length-n+i]);i===0?ctx.moveTo(cx+i,py):ctx.lineTo(cx+i,py);}
+  ctx.lineTo(cx+n-1,cy+ch);ctx.lineTo(cx,cy+ch);ctx.closePath();
+  const fill=ctx.createLinearGradient(0,cy,0,cy+ch);
+  if(isW) {
+    fill.addColorStop(0, inProfit?'rgba(50,220,130,0.20)':'rgba(50,220,130,0.06)');
+    fill.addColorStop(1,'rgba(0,0,0,0)');
+  } else {
+    if(inCrash){fill.addColorStop(0,'rgba(255,92,92,0.16)');fill.addColorStop(1,'rgba(255,92,92,0.01)');}
+    else if(inFOMO){fill.addColorStop(0,'rgba(50,220,130,0.08)');fill.addColorStop(1,'rgba(0,0,0,0)');}
+    else{fill.addColorStop(0,'rgba(238,240,248,0.04)');fill.addColorStop(1,'rgba(0,0,0,0)');}
+  }
+  ctx.fillStyle=fill;ctx.fill();
+
+  // Price line
+  ctx.beginPath();
+  for(let i=0;i<n;i++){const py=pY(priceHist[priceHist.length-n+i]);i===0?ctx.moveTo(cx+i,py):ctx.lineTo(cx+i,py);}
+  const lc = isW
+    ? (inProfit?'#32dc82':'rgba(50,220,130,0.5)')
+    : (inCrash?'#ff5c5c':inFOMO?'rgba(50,220,130,0.65)':'rgba(238,240,248,0.4)');
+  ctx.strokeStyle=lc;ctx.lineWidth=inProfit||inCrash?2.2:1.7;
+  ctx.shadowColor=lc;ctx.shadowBlur=(inProfit||inCrash)?16:4;ctx.stroke();ctx.shadowBlur=0;
+
+  // Trader entry + stop-loss markers
+  if(!isW && traderBTC>0 && traderEntry>0) {
+    const ey = pY(traderEntry);
+    ctx.beginPath();ctx.moveTo(cx,ey);ctx.lineTo(cx+cw,ey);
+    ctx.strokeStyle='rgba(245,200,66,0.35)';ctx.lineWidth=1;ctx.setLineDash([5,5]);ctx.stroke();ctx.setLineDash([]);
+    ctx.font='700 8px Inter';ctx.textAlign='right';ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(245,200,66,0.5)';ctx.fillText('ВХОД @'+Math.round(traderEntry),cx+cw-4,ey-8);
+    // Stop-loss line
+    const slPrice = traderEntry - 260;
+    const sly = pY(slPrice);
+    ctx.beginPath();ctx.moveTo(cx,sly);ctx.lineTo(cx+cw,sly);
+    ctx.strokeStyle='rgba(255,92,92,0.25)';ctx.lineWidth=1;ctx.setLineDash([3,5]);ctx.stroke();ctx.setLineDash([]);
+    if(inCrash){
+      ctx.fillStyle='rgba(255,92,92,0.45)';ctx.textAlign='right';
+      ctx.fillText('СТОП',cx+cw-4,sly-7);
+    }
+  }
+
+  // Key event markers on whale chart
+  if(isW) {
+    const markPhases = [
+      {ph:PH_WALL, lbl:'BID', col:'#f5c842'},
+      {ph:PH_CNCL, lbl:'CANCEL', col:'#ff5c5c'},
+      {ph:PH_SELL, lbl:'SELL', col:'#32dc82'},
+    ];
+    for(const m of markPhases) {
+      if(t > m.ph) {
+        const mkF = Math.floor(m.ph * CYCLE);
+        const idx = n - (Math.floor(frameN % CYCLE) - mkF);
+        if(idx >= 0 && idx < n) {
+          const mx = cx + idx;
+          ctx.beginPath();ctx.moveTo(mx,cy);ctx.lineTo(mx,cy+ch);
+          ctx.strokeStyle=m.col.replace('#','rgba(').replace(')',',0.22)');
+          ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.stroke();ctx.setLineDash([]);
+          ctx.font='700 8px Inter';ctx.textAlign='center';ctx.textBaseline='top';
+          ctx.fillStyle=m.col;ctx.shadowColor=m.col;ctx.shadowBlur=6;
+          ctx.fillText(m.lbl,mx,cy+4);ctx.shadowBlur=0;
+        }
+      }
+    }
+  }
+
+  ctx.restore();
+
+  // Live dot
+  const lv=priceHist[priceHist.length-1],lvY=pY(lv);
+  ctx.beginPath();ctx.arc(cx+cw-1,lvY,4.5,0,Math.PI*2);
+  ctx.fillStyle=lc;ctx.shadowColor=lc;ctx.shadowBlur=10;ctx.fill();ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(cx+cw-1,lvY,2,0,Math.PI*2);
+  ctx.fillStyle='#fff';ctx.fill();
+
+  const chartLbl = isW ? 'ГРАФИК  КИТ' : 'ГРАФИК  ТРЕЙДЕР';
+  const chartLblCol = isW ? (inProfit?'rgba(50,220,130,0.3)':'rgba(50,220,130,0.14)') : (inCrash?'rgba(255,92,92,0.3)':'rgba(238,240,248,0.14)');
+  label(chartLbl,cx+8,cy+7,'700 8px Inter',chartLblCol,'left','top');
+
+  // Price label (current)
+  const curP = getPrice(frameN).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const curY2 = pY(getPrice(frameN));
+  label(curP, cx+cw-6, Math.max(cy+14, Math.min(cy+ch-14, curY2-12)), '700 10px JetBrains Mono', lc, 'right','middle',4);
+}
+
+// ══════════ DRAW: TOP BAR ══════════
+
+function drawTopBar() {
+  const t = (frameN % CYCLE) / CYCLE;
+  const price = getPrice(frameN);
+  const inCrash = t >= PH_CRSH;
+  const wallOn  = t >= PH_WALL && t < PH_CNCL;
+  const inProfit= t >= PH_SELL && t < PH_CRSH;
+
+  ctx.fillStyle='rgba(6,7,12,0.98)';ctx.fillRect(0,0,W,TOP);
+  ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,TOP);ctx.lineTo(W,TOP);ctx.stroke();
+
+  // Left label
+  ctx.font='900 13px Inter';ctx.textAlign='left';ctx.textBaseline='middle';
+  ctx.fillStyle='rgba(50,220,130,0.7)';ctx.shadowColor='#32dc82';ctx.shadowBlur=inProfit?10:4;
+  ctx.fillText('КИТ',LX,TOP*0.5);ctx.shadowBlur=0;
+  ctx.font='600 9px Inter';ctx.fillStyle='rgba(50,220,130,0.25)';ctx.fillText('WHALE TERMINAL',LX,TOP*0.5+15);
+
+  // Right label
+  ctx.font='900 13px Inter';ctx.textAlign='right';ctx.textBaseline='middle';
+  ctx.fillStyle=inCrash?'rgba(255,92,92,0.8)':'rgba(238,240,248,0.45)';
+  if(inCrash){ctx.shadowColor='#ff5c5c';ctx.shadowBlur=8;}
+  ctx.fillText('ТРЕЙДЕР',W-LX,TOP*0.5);ctx.shadowBlur=0;
+  ctx.font='600 9px Inter';ctx.textAlign='right';ctx.textBaseline='middle';
+  ctx.fillStyle=inCrash?'rgba(255,92,92,0.25)':'rgba(238,240,248,0.15)';
+  ctx.fillText('RETAIL TRADER',W-LX,TOP*0.5+15);
+
+  // Center price
+  const pCol = inCrash?'#ff5c5c':inProfit||wallOn?'#32dc82':'#eef0f8';
+  ctx.font='900 22px Inter';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle=pCol;ctx.shadowColor=pCol;ctx.shadowBlur=inCrash||inProfit?14:4;
+  ctx.fillText(price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),CX,TOP*0.44);
+  ctx.shadowBlur=0;
+
+  // Phase pill
+  const phases=[
+    {min:0,      max:PH_HUNT,  txt:'09:12 — МОНИТОРИНГ',       col:'rgba(238,240,248,0.12)'},
+    {min:PH_HUNT, max:PH_WALL, txt:'09:14 — ЦЕЛЬ НАЙДЕНА',      col:'rgba(245,200,66,0.35)'},
+    {min:PH_WALL, max:PH_CNCL, txt:'09:14 — ЛОВУШКА АКТИВНА',   col:'rgba(245,200,66,0.55)'},
+    {min:PH_CNCL, max:PH_SELL, txt:'09:15 — ЗАЯВКА СНЯТА',      col:'rgba(255,92,92,0.6)'},
+    {min:PH_SELL, max:PH_CRSH, txt:'09:15 — КИТ ПРОДАЁТ',       col:'rgba(50,220,130,0.65)'},
+    {min:PH_CRSH, max:2,       txt:'09:16 — ИТОГ',              col:'rgba(255,92,92,0.55)'},
+  ];
+  let ph=phases[0];
+  for(const p of phases) if(t>=p.min) ph=p;
+  ctx.font='700 9px Inter';ctx.textAlign='center';ctx.textBaseline='bottom';
+  ctx.fillStyle=ph.col;ctx.fillText(ph.txt,CX,TOP-5);
+}
+
+// ══════════ DRAW: BOTTOM BAR ══════════
+
+function drawBottomBar() {
+  const t = (frameN % CYCLE) / CYCLE;
+  const inResult = t >= PH_RSLT;
+  const inCrash  = t >= PH_CRSH;
+
+  ctx.fillStyle='rgba(6,7,12,0.98)';ctx.fillRect(0,BOT,W,H-BOT);
+  ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,BOT);ctx.lineTo(W,BOT);ctx.stroke();
+
+  const bMid = BOT + (H-BOT)*0.5;
+
+  // Whale profit
+  const profDisp = Math.round(whaleProfitDisp);
+  const wStr = profDisp > 100 ? '+$'+profDisp.toLocaleString() : '$'+Math.round(whaleBal).toLocaleString();
+  ctx.font=inResult?'900 28px Inter':'900 22px Inter';
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  const wCol = profDisp>100?'#32dc82':'rgba(238,240,248,0.4)';
+  ctx.fillStyle=wCol;ctx.shadowColor=wCol;ctx.shadowBlur=profDisp>100?16:0;
+  ctx.fillText(wStr,LX,bMid);ctx.shadowBlur=0;
+  ctx.font='600 9px Inter';ctx.textAlign='left';ctx.textBaseline='bottom';
+  ctx.fillStyle='rgba(50,220,130,0.25)';ctx.fillText(profDisp>100?'ПРОФИТ КИТА':'Баланс кита',LX,bMid-14);
+
+  // Trader loss
+  const lossDisp = Math.round(traderLossDisp);
+  const tStr = lossDisp > 10 ? '-$'+Math.round(lossDisp).toLocaleString() : '$'+Math.round(traderBal).toLocaleString();
+  ctx.font=inResult?'900 28px Inter':'900 22px Inter';
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  const tCol = lossDisp > 10 ? '#ff5c5c' : inCrash ? '#ff7070' : 'rgba(238,240,248,0.3)';
+  ctx.fillStyle=tCol;ctx.shadowColor=tCol;ctx.shadowBlur=lossDisp>10?14:0;
+  ctx.fillText(tStr,W-LX,bMid);ctx.shadowBlur=0;
+  ctx.font='600 9px Inter';ctx.textAlign='right';ctx.textBaseline='bottom';
+  ctx.fillStyle='rgba(255,92,92,0.25)';ctx.fillText(lossDisp>10?'УБЫТОК ТРЕЙДЕРА':'Баланс трейдера',W-LX,bMid-14);
+
+  // Center VS
+  if(inResult) {
+    ctx.font='900 13px Inter';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(238,240,248,0.15)';ctx.fillText('vs',CX,bMid);
+  }
+}
+
+// ══════════ DRAW: DIVIDER ══════════
+
+function drawDivider() {
+  const t = (frameN % CYCLE) / CYCLE;
+  const pulse = 0.4 + 0.3*Math.sin(frameN*0.08);
+  ctx.strokeStyle=`rgba(255,255,255,${0.04+pulse*0.02})`;ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(CX,TOP);ctx.lineTo(CX,BOT);ctx.stroke();
+}
+
+// ══════════ DRAW MAIN ══════════
+
+function draw() {
+  const sx = shakeAmt > 0 ? rnd(-shakeAmt,shakeAmt) : 0;
+  const sy = shakeAmt > 0 ? rnd(-shakeAmt,shakeAmt) : 0;
+  ctx.save(); ctx.translate(sx,sy);
+
+  ctx.fillStyle='#07080e'; ctx.fillRect(-20,-20,W+40,H+40);
+
+  for(const d of bgDots){ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,Math.PI*2);ctx.fillStyle=d.col;ctx.globalAlpha=d.a;ctx.fill();ctx.globalAlpha=1;}
+
+  drawWhale();
+  drawTrader();
+  drawDivider();
+
+  // Rings
+  for(const r of rings){
+    ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,Math.PI*2);
+    ctx.strokeStyle=r.col;ctx.lineWidth=r.life*(r.thick?4:2);
+    ctx.globalAlpha=r.life*0.65;ctx.shadowColor=r.col;ctx.shadowBlur=10;
+    ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
+  }
+  for(const l of ltns) drawLtn(l.x1,l.y1,l.x2,l.y2,l.col,l.life*0.85,1.6);
+  for(const p of parts){
+    ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.3,p.r*p.life),0,Math.PI*2);
+    ctx.fillStyle=p.col;ctx.globalAlpha=p.life;ctx.shadowColor=p.col;ctx.shadowBlur=5;
+    ctx.fill();ctx.shadowBlur=0;ctx.globalAlpha=1;
+  }
+  for(const s of sparks){
+    const ex=s.x-s.vx*s.len*(0.4+s.life*0.6),ey=s.y-s.vy*s.len*(0.4+s.life*0.6);
+    ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(ex,ey);
+    ctx.strokeStyle=s.col;ctx.lineWidth=s.life*2.2;ctx.globalAlpha=s.life*0.8;
+    ctx.shadowColor=s.col;ctx.shadowBlur=5;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
+  }
+  for(const f of flashes){
+    const pp=Math.max(0,1-f.life);
+    ctx.beginPath();ctx.arc(f.x,f.y,4+pp*90,0,Math.PI*2);
+    const fc=f.col||'#32dc82';
+    ctx.fillStyle=fc.replace('#','rgba(').replace(/(..)(..)(..)\)/,(_,r,g,b)=>`${parseInt(r,16)},${parseInt(g,16)},${parseInt(b,16)},${f.life*0.3})`);
+    ctx.fillStyle=`rgba(255,255,255,${f.life*0.08})`;ctx.fill();
+    ctx.beginPath();ctx.arc(f.x,f.y,2+pp*28,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,255,${f.life*0.7})`;ctx.fill();
+  }
+  for(const fn of floatNums){
+    ctx.font=fn.big?`900 ${Math.round(15+fn.life*5)}px Inter`:'800 11px Inter';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=fn.col;ctx.globalAlpha=fn.life;ctx.shadowColor=fn.col;ctx.shadowBlur=fn.big?18:7;
+    ctx.fillText(fn.text,fn.x,fn.y);ctx.shadowBlur=0;ctx.globalAlpha=1;
+  }
+
+  ctx.restore();
+
+  drawTopBar();
+  drawBottomBar();
+
+  if(screenFlash>0){
+    if(screenFlash>0.7){ctx.fillStyle=`rgba(255,255,255,${(screenFlash-0.7)*0.3})`;ctx.fillRect(0,0,W,H);}
+    const t2=(frameN%CYCLE)/CYCLE;
+    const flashCol = t2>=PH_SELL&&t2<PH_CRSH?'rgba(50,220,130,':' rgba(255,92,92,';
+    ctx.fillStyle=`${flashCol}${Math.min(1,screenFlash)*0.1})`;ctx.fillRect(0,0,W,H);
+  }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+</script>
+</body>
+</html>

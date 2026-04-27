@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spoofing — Призрак стены</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #050608; display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; font-family: 'Inter', sans-serif;
+}
+.frame {
+  width: 540px; height: 960px; position: relative; overflow: hidden;
+  background: #08090f; border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px; box-shadow: 0 0 80px rgba(0,0,0,0.9);
+}
+canvas { position: absolute; top: 0; left: 0; width: 540px; height: 960px; z-index: 1; }
+
+.hdr {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  padding: 22px 28px 18px; display: flex; justify-content: space-between; align-items: flex-start;
+  background: linear-gradient(180deg, rgba(8,9,15,0.97) 60%, transparent 100%);
+}
+.hdr-pair { font-size: 24px; font-weight: 800; color: #eef0f8; letter-spacing: 0.3px; }
+.hdr-pair em { color: rgba(238,240,248,0.28); font-style: normal; font-weight: 500; }
+.hdr-sub { font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.8px; text-transform: uppercase; margin-top: 5px; }
+.hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.spoof-tag {
+  padding: 4px 11px; border-radius: 7px;
+  background: rgba(255,92,92,0.10); border: 1px solid rgba(255,92,92,0.32);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #ff5c5c;
+  text-shadow: 0 0 8px rgba(255,92,92,0.7);
+  animation: spfPulse 1.2s ease-in-out infinite;
+}
+@keyframes spfPulse { 0%,100%{opacity:0.45} 50%{opacity:1} }
+.live-badge { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.5px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #ff5c5c; box-shadow: 0 0 8px rgba(255,92,92,0.9); animation: ldBlink 2s ease-in-out infinite; }
+@keyframes ldBlink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+.readout {
+  position: absolute; top: 108px; left: 0; right: 0; z-index: 3;
+  height: 60px; display: flex; align-items: stretch;
+  background: rgba(8,9,15,0.94);
+  border-top: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,92,92,0.07);
+}
+.rd-blk { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 16px; gap: 2px; }
+.rd-blk.ctr { align-items: center; border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); }
+.rd-blk.right { align-items: flex-end; }
+.rd-lbl { font-size: 9px; font-weight: 700; color: #1a2235; letter-spacing: 1.8px; text-transform: uppercase; }
+.rd-val { font-size: 24px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+.rd-val.r { color: #ff5c5c; text-shadow: 0 0 12px rgba(255,92,92,0.4); }
+.rd-val.g { color: #32dc82; text-shadow: 0 0 12px rgba(50,220,130,0.4); }
+.rd-val.y { color: #f5c842; text-shadow: 0 0 12px rgba(245,200,66,0.4); }
+.rd-val.dim { color: rgba(238,240,248,0.22); }
+.rd-val.w { color: #eef0f8; }
+.rd-val.pulse { animation: rdPulse 0.8s ease-in-out infinite; }
+@keyframes rdPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+.rd-sub { font-size: 10px; font-weight: 500; color: #1a2235; }
+
+.stats {
+  position: absolute; bottom: 98px; left: 0; right: 0; z-index: 3;
+  display: flex; padding: 0 16px; gap: 8px;
+}
+.s-box {
+  flex: 1; background: rgba(8,9,15,0.88); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.055); border-radius: 14px;
+  padding: 14px 12px 12px; display: flex; flex-direction: column; gap: 3px;
+}
+.s-box.accent { border-color: rgba(255,92,92,0.2); }
+.s-lbl { font-size: 9px; font-weight: 700; color: #1a2235; letter-spacing: 1.8px; text-transform: uppercase; }
+.s-val { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+.s-val.r { color: #ff5c5c; }
+.s-val.g { color: #32dc82; text-shadow: 0 0 10px rgba(50,220,130,0.3); }
+.s-val.w { color: #eef0f8; }
+.s-sub { font-size: 10px; font-weight: 500; color: #1a2235; }
+
+.footer {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  height: 90px; padding: 16px 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(0deg, rgba(8,9,15,0.98) 65%, transparent 100%);
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.f-lbl { font-size: 10px; font-weight: 700; color: #1a2235; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+.f-price { font-size: 28px; font-weight: 800; color: #eef0f8; letter-spacing: -0.5px; }
+.f-tag {
+  padding: 4px 12px; border-radius: 7px;
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px;
+  animation: ldBlink 1.6s ease-in-out infinite;
+}
+.f-delta { font-size: 11px; font-weight: 500; color: #1a2235; margin-top: 5px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <div class="hdr">
+    <div>
+      <div class="hdr-pair">BTC<em>/USDT</em></div>
+      <div class="hdr-sub">Манипуляция стаканом</div>
+    </div>
+    <div class="hdr-right">
+      <div class="spoof-tag">⚠ SPOOF</div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>
+  </div>
+
+  <div class="readout">
+    <div class="rd-blk">
+      <span class="rd-lbl">Цена</span>
+      <span class="rd-val w" id="rdPrice">65,231.00</span>
+      <span class="rd-sub">текущая</span>
+    </div>
+    <div class="rd-blk ctr">
+      <span class="rd-lbl">Размер стены</span>
+      <span class="rd-val dim" id="rdWall">—</span>
+      <span class="rd-sub">BTC в спуфе</span>
+    </div>
+    <div class="rd-blk right">
+      <span class="rd-lbl">Статус</span>
+      <span class="rd-val dim" id="rdStatus">ТИХО</span>
+      <span class="rd-sub" id="rdSub">мониторинг</span>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="s-box accent">
+      <div class="s-lbl">Спуфов</div>
+      <div class="s-val r" id="sCount">0</div>
+      <div class="s-sub">поймано</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">Макс стена</div>
+      <div class="s-val w" id="sWall">—</div>
+      <div class="s-sub">BTC фантом</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">Движение</div>
+      <div class="s-val g" id="sJump">+$0</div>
+      <div class="s-sub">после исчезн.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <div class="f-lbl">Last Price</div>
+      <div class="f-price" id="fPrice">65,231.00</div>
+    </div>
+    <div style="text-align:right">
+      <div class="f-tag" id="fTag" style="color:#32dc82;border:1px solid rgba(50,220,130,0.2);background:rgba(50,220,130,0.08)">MONITORING</div>
+      <div class="f-delta" id="fDelta">Δ 0.00 USD (0.000%)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 540, H = 960, CX = 270;
+
+// ── Cycle ──
+const CYCLE     = 620;
+const PH_BLDS   = 0.10;  // wall starts building
+const PH_BLDE   = 0.31;  // wall fully built
+const PH_ACTIVE = 0.63;  // wall vanishes
+const PH_ROCKET = 0.82;  // price peak
+
+// ── Orderbook layout ──
+const OB_X     = 22, OB_W = 496;
+const OB_TOP   = 184;
+const ROW_H    = 30;
+const N_ABOVE  = 4;   // normal ask rows above spoof
+const N_BELOW  = 5;   // bid rows
+const SPREAD_H = 34;
+const SPOOF_H_MIN = 30;
+const SPOOF_H_MAX = 108;
+
+// Column positions
+const PRICE_END_X = 128;   // right edge of price column
+const BAR_X       = 136;   // bar start
+const BAR_MAX_W   = 264;   // max bar width
+const SIZE_END_X  = OB_X + OB_W - 6; // right edge of size column
+
+// ── Data ──
+const ASKS = [
+  { price: 65248, size: 5.2  },
+  { price: 65244, size: 12.8 },
+  { price: 65240, size: 8.4  },
+  { price: 65236, size: 22.1 },
+];
+const SPOOF_PRICE       = 65232;
+const SPOOF_SIZE_MAX    = 8540;
+const SPOOF_SIZE_NORMAL = 18.2;
+const BIDS = [
+  { price: 65230, size: 14.7 },
+  { price: 65228, size: 9.3  },
+  { price: 65224, size: 31.5 },
+  { price: 65220, size: 18.9 },
+  { price: 65214, size: 7.6  },
+];
+const P_BASE = 65231, P_MIN = 65188, P_MAX = 65308;
+
+// ── Chart ──
+const CHART_X = 26, CHART_TOP = 614, CHART_W = 488, CHART_H = 135;
+const N_PTS   = CHART_W;
+
+// ── State ──
+let frameN = 0, lastVanishCyc = -1;
+let wallGrowth  = 0;
+let screenFlash = 0, shakeAmt = 0;
+let bannerLife  = 0;
+let spoofCount  = 0;
+let prcHist     = new Array(N_PTS).fill(P_BASE);
+
+// ── Effects ──
+let parts = [], sparks = [], rings = [], lightnings = [], flashes = [], floatNums = [];
+
+// ── Trader particles ──
+let traders = [];
+function initTraders() {
+  traders = [];
+  for (let i = 0; i < 18; i++) {
+    traders.push({
+      x: OB_X + 18 + Math.random() * (OB_W - 36),
+      y: OB_TOP + 20 + Math.random() * 350,
+      vx: rnd(-0.22, 0.22),
+      vy: rnd(-0.16, 0.16),
+      r: rnd(1.8, 3.8),
+      col: Math.random() > 0.5 ? '#f5c842' : (Math.random() > 0.5 ? '#eef0f8' : '#32dc82'),
+      baseAlpha: rnd(0.16, 0.40),
+    });
+  }
+}
+
+// ── BG dust ──
+let bgDots = [];
+for (let i = 0; i < 42; i++) {
+  bgDots.push({
+    x: rnd(0, W), y: rnd(0, H),
+    vx: rnd(-0.055, 0.055), vy: rnd(-0.055, 0.055),
+    r: rnd(0.4, 1.6), a: rnd(0.02, 0.07),
+    col: Math.random() > 0.5 ? '#ff5c5c' : '#f5c842'
+  });
+}
+
+function rnd(a, b) { return a + Math.random() * (b - a); }
+
+// ── Row geometry (dynamic due to spoof height) ──
+function getRows() {
+  const spoofH = SPOOF_H_MIN + (SPOOF_H_MAX - SPOOF_H_MIN) * wallGrowth;
+  let y = OB_TOP;
+  const rows = [];
+  for (let i = 0; i < N_ABOVE; i++) {
+    rows.push({ type: 'ask', idx: i, y, h: ROW_H, data: ASKS[i] });
+    y += ROW_H;
+  }
+  rows.push({ type: 'spoof', y, h: spoofH });
+  y += spoofH;
+  rows.push({ type: 'spread', y, h: SPREAD_H });
+  y += SPREAD_H;
+  for (let i = 0; i < N_BELOW; i++) {
+    rows.push({ type: 'bid', idx: i, y, h: ROW_H, data: BIDS[i] });
+    y += ROW_H;
+  }
+  return { rows, totalH: y - OB_TOP };
+}
+
+// ── Bar width (spoof dominates scale) ──
+function bw(size) {
+  const spoofVisible  = wallGrowth > 0.05;
+  const visibleSpoof  = SPOOF_SIZE_MAX * wallGrowth;
+  const maxSize       = spoofVisible ? Math.max(visibleSpoof, 31.5) : 31.5;
+  return Math.min(BAR_MAX_W, (size / maxSize) * BAR_MAX_W);
+}
+
+// ── Price generation ──
+function genPrice(f) {
+  const t     = (f % CYCLE) / CYCLE;
+  const noise = Math.sin(f * 0.11) * 1.1 + Math.sin(f * 0.073) * 0.8;
+  if (t < PH_BLDS)    return P_BASE + noise;
+  if (t <= PH_ACTIVE) {
+    const drift = Math.min(1, (t - PH_BLDS) / (PH_ACTIVE - PH_BLDS));
+    return P_BASE - drift * 22 + noise;
+  }
+  if (t <= PH_ROCKET) {
+    const pt = (t - PH_ACTIVE) / (PH_ROCKET - PH_ACTIVE);
+    const ep = pt < 0.5 ? 2*pt*pt : -1+(4-2*pt)*pt;
+    return (P_BASE - 22) + ep * 82 + noise * (1 - pt * 0.8);
+  }
+  const st = (t - PH_ROCKET) / (1 - PH_ROCKET);
+  return (P_BASE + 60) - st * 30 + noise * 0.4;
+}
+
+// ── Lightning ──
+function drawLightning(x1, y1, x2, y2, col, alpha, w) {
+  const pts = [{ x: x1, y: y1 }];
+  for (let i = 1; i < 6; i++) {
+    const t = i / 6;
+    pts.push({ x: x1+(x2-x1)*t+rnd(-14,14), y: y1+(y2-y1)*t+rnd(-10,10) });
+  }
+  pts.push({ x: x2, y: y2 });
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, alpha);
+  ctx.strokeStyle = col; ctx.lineWidth = w;
+  ctx.shadowColor = col; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = w * 0.3; ctx.shadowBlur = 4;
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── Vanish explosion ──
+function triggerVanish(spoofMidY) {
+  spoofCount++;
+  screenFlash = 1.3; shakeAmt = 13; bannerLife = 0.01;
+
+  const sx = CX, sy = spoofMidY;
+  flashes.push({ x: sx, y: sy, life: 1 });
+
+  for (let i = 0; i < 52; i++) {
+    const a = rnd(0, Math.PI*2), s = rnd(2, 13);
+    parts.push({
+      x: OB_X + rnd(20, OB_W-20), y: sy,
+      vx: Math.cos(a)*s, vy: Math.sin(a)*s,
+      r: rnd(2, 7), life: 1,
+      col: Math.random() > 0.35 ? '#ff5c5c' : (Math.random() > 0.5 ? '#f5c842' : '#ff9030')
+    });
+  }
+  for (let i = 0; i < 26; i++) {
+    const a = rnd(0, Math.PI*2), s = rnd(5, 22);
+    sparks.push({ x: sx, y: sy, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, len: rnd(8,32), col: i%2===0?'#ff5c5c':'#f5c842' });
+  }
+  rings.push({ x: sx, y: sy, r: 4, maxR: 300, life: 1, col: '#ff5c5c', thick: true });
+  for (let i = 1; i <= 4; i++) {
+    setTimeout(() => rings.push({ x: sx, y: sy, r: 4, maxR: 80+i*64, life: 1, col: i%2===0?'#f5c842':'#ffffff', thick: false }), i*85);
+  }
+  for (let i = 0; i < 6; i++) {
+    const lx = OB_X + rnd(10, OB_W-10);
+    lightnings.push({ x1: lx, y1: sy-rnd(0,28), x2: lx+rnd(-30,30), y2: sy+rnd(18,55), life: 1.0, col: i<3?'#ff5c5c':'#f5c842', thick: i<1 });
+  }
+  floatNums.push({ x: CX, y: sy-16, text: 'ИСЧЕЗ!', life: 1.3, vy: -1.6, col: '#ff5c5c', big: true });
+  setTimeout(() => floatNums.push({ x: CX, y: sy+60, text: '+$60.00 ↑', life: 1.2, vy: -0.9, col: '#32dc82', big: false }), 420);
+
+  // Update stats DOM
+  document.getElementById('sCount').textContent = spoofCount;
+  document.getElementById('sWall').textContent  = SPOOF_SIZE_MAX.toLocaleString();
+}
+
+// ── Update ──
+function update() {
+  frameN++;
+  const cf = frameN % CYCLE;
+  const ci = Math.floor(frameN / CYCLE);
+  const t  = cf / CYCLE;
+
+  // Wall growth
+  if (t < PH_BLDS) {
+    wallGrowth = 0;
+  } else if (t < PH_BLDE) {
+    wallGrowth = (t - PH_BLDS) / (PH_BLDE - PH_BLDS);
+  } else if (t <= PH_ACTIVE) {
+    wallGrowth = 1.0;
+  } else {
+    wallGrowth = Math.max(0, wallGrowth - 0.11); // rapid collapse
+  }
+
+  // Trigger vanish
+  if (t >= PH_ACTIVE && lastVanishCyc !== ci) {
+    lastVanishCyc = ci;
+    const { rows } = getRows();
+    const sr = rows.find(r => r.type === 'spoof');
+    triggerVanish(sr ? sr.y + sr.h * 0.5 : 400);
+  }
+
+  // Banner lifecycle
+  if (bannerLife > 0 && bannerLife < 1) bannerLife = Math.min(1, bannerLife + 0.052);
+  if (bannerLife >= 1 && t > 0.88) bannerLife = Math.max(0, bannerLife - 0.055);
+
+  // Price history
+  prcHist.push(genPrice(frameN)); prcHist.shift();
+
+  // Decay
+  if (shakeAmt > 0) { shakeAmt *= 0.72; if (shakeAmt < 0.25) shakeAmt = 0; }
+  if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - 0.042);
+
+  // Trader updates
+  const wallOn     = wallGrowth > 0.18;
+  const afterVanish = t > PH_ACTIVE && t < PH_ROCKET + 0.04;
+  for (const tr of traders) {
+    if (wallOn) {
+      tr.vy += 0.013; tr.vx += rnd(-0.008, 0.008);
+    } else if (afterVanish) {
+      tr.vy -= 0.020;
+    } else {
+      tr.vy *= 0.94; tr.vx *= 0.94;
+    }
+    tr.vx = Math.max(-0.9, Math.min(0.9, tr.vx));
+    tr.vy = Math.max(-1.4, Math.min(1.4, tr.vy));
+    tr.x += tr.vx; tr.y += tr.vy;
+    if (tr.x < OB_X+10)        { tr.x = OB_X+10;        tr.vx *= -1; }
+    if (tr.x > OB_X+OB_W-10)   { tr.x = OB_X+OB_W-10;  tr.vx *= -1; }
+    if (tr.y < OB_TOP+8)        { tr.y = OB_TOP+8;       tr.vy *= -0.5; }
+    if (tr.y > OB_TOP+440)      { tr.y = OB_TOP+440;     tr.vy *= -0.5; }
+  }
+
+  for (let i = parts.length-1; i>=0; i--) {
+    const p = parts[i]; p.x+=p.vx; p.y+=p.vy; p.vx*=0.91; p.vy*=0.91; p.life-=0.026; if(p.life<=0) parts.splice(i,1);
+  }
+  for (let i = sparks.length-1; i>=0; i--) {
+    const s = sparks[i]; s.x+=s.vx; s.y+=s.vy; s.vx*=0.88; s.vy*=0.88; s.life-=0.037; if(s.life<=0) sparks.splice(i,1);
+  }
+  for (let i = rings.length-1; i>=0; i--) {
+    const rg = rings[i]; rg.r+=(rg.maxR-rg.r)*0.086; rg.life-=0.025; if(rg.life<=0) rings.splice(i,1);
+  }
+  for (let i = flashes.length-1; i>=0; i--) { flashes[i].life-=0.056; if(flashes[i].life<=0) flashes.splice(i,1); }
+  for (let i = lightnings.length-1; i>=0; i--) { lightnings[i].life-=0.12; if(lightnings[i].life<=0) lightnings.splice(i,1); }
+  for (let i = floatNums.length-1; i>=0; i--) {
+    const fn=floatNums[i]; fn.y+=fn.vy; fn.vy*=0.97; fn.life-=0.017; if(fn.life<=0) floatNums.splice(i,1);
+  }
+  for (const d of bgDots) {
+    d.x+=d.vx; d.y+=d.vy;
+    if(d.x<0) d.x=W; if(d.x>W) d.x=0; if(d.y<0) d.y=H; if(d.y>H) d.y=0;
+  }
+
+  // ── DOM ──
+  const curP  = genPrice(frameN);
+  const wSize = Math.round(SPOOF_SIZE_MAX * wallGrowth);
+  const wallVis = wallGrowth > 0.08;
+  const inRocket = t > PH_ACTIVE && t < PH_ROCKET;
+
+  document.getElementById('rdPrice').textContent = curP.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const rdW = document.getElementById('rdWall');
+  rdW.textContent = wallVis ? wSize.toLocaleString() + ' BTC' : '—';
+  rdW.className   = 'rd-val ' + (wallVis ? 'r' : 'dim');
+
+  const stEl  = document.getElementById('rdStatus');
+  const subEl = document.getElementById('rdSub');
+  if (inRocket) {
+    stEl.textContent = 'ИСЧЕЗ!'; stEl.className = 'rd-val g';
+    subEl.textContent = 'цена свободна';
+  } else if (wallGrowth > 0.6) {
+    stEl.textContent = 'АКТИВЕН'; stEl.className = 'rd-val r pulse';
+    subEl.textContent = 'рынок обманут';
+  } else if (wallGrowth > 0.01) {
+    stEl.textContent = 'РАСТЁТ...'; stEl.className = 'rd-val y';
+    subEl.textContent = 'стена строится';
+  } else {
+    stEl.textContent = 'ТИХО'; stEl.className = 'rd-val dim';
+    subEl.textContent = 'мониторинг';
+  }
+
+  document.getElementById('fPrice').textContent = curP.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const fTag = document.getElementById('fTag');
+  const fDelta = document.getElementById('fDelta');
+  if (wallGrowth > 0.1) {
+    fTag.textContent = 'SPOOF ACTIVE';
+    fTag.style.cssText = 'color:#ff5c5c;border:1px solid rgba(255,92,92,0.32);background:rgba(255,92,92,0.09);padding:4px 12px;border-radius:7px;font-size:11px;font-weight:800;letter-spacing:1.5px;animation:ldBlink 1.2s ease-in-out infinite';
+  } else {
+    fTag.textContent = 'MONITORING';
+    fTag.style.cssText = 'color:#32dc82;border:1px solid rgba(50,220,130,0.2);background:rgba(50,220,130,0.08);padding:4px 12px;border-radius:7px;font-size:11px;font-weight:800;letter-spacing:1.5px;animation:ldBlink 2s ease-in-out infinite';
+  }
+  const delta = curP - P_BASE;
+  if (Math.abs(delta) > 1) {
+    fDelta.textContent = (delta > 0 ? 'Δ +' : 'Δ ') + delta.toFixed(2) + ' USD (' + (delta/P_BASE*100).toFixed(3) + '%)';
+    fDelta.style.color = delta > 0 ? '#1a4030' : 'rgba(255,92,92,0.35)';
+  } else {
+    fDelta.textContent = 'Δ 0.00 USD (0.000%)'; fDelta.style.color = '#1a2235';
+  }
+  const sJump = document.getElementById('sJump');
+  const jump  = Math.round(curP - P_BASE);
+  if (jump > 5) { sJump.textContent = '+$'+jump; sJump.className = 's-val g'; }
+  else           { sJump.textContent = '+$0';      sJump.className = 's-val w'; }
+}
+
+// ══════════════════════════
+//  DRAW: Orderbook
+// ══════════════════════════
+function drawOrderbook() {
+  const { rows, totalH } = getRows();
+  const t     = (frameN % CYCLE) / CYCLE;
+  const pulse = 0.6 + 0.4 * Math.sin(frameN * 0.15);
+
+  // Ambient red glow when wall active
+  if (wallGrowth > 0.1) {
+    const { rows: r2 } = getRows();
+    const sr = r2.find(x => x.type === 'spoof');
+    if (sr) {
+      const ag = ctx.createRadialGradient(CX, sr.y + sr.h * 0.5, 0, CX, sr.y + sr.h * 0.5, 260);
+      ag.addColorStop(0, `rgba(255,50,50,${wallGrowth * 0.075 * pulse})`);
+      ag.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = ag; ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // Column headers
+  ctx.font = '600 9px Inter'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(238,240,248,0.12)';
+  ctx.textAlign = 'right';  ctx.fillText('ЦЕНА', PRICE_END_X, OB_TOP - 10);
+  ctx.textAlign = 'left';   ctx.fillText('ОБЪЁМ', BAR_X + 4, OB_TOP - 10);
+  ctx.textAlign = 'right';  ctx.fillText('КОЛ-ВО BTC', SIZE_END_X, OB_TOP - 10);
+
+  for (const row of rows) {
+    const { y: ry, h: rh } = row;
+
+    if (row.type === 'ask') {
+      const d = row.data, barW2 = bw(d.size);
+      ctx.fillStyle = `rgba(255,92,92,${0.025 + (N_ABOVE - row.idx) * 0.007})`;
+      ctx.fillRect(OB_X, ry, OB_W, rh);
+      ctx.fillStyle = 'rgba(255,255,255,0.028)';
+      ctx.fillRect(OB_X, ry + rh - 1, OB_W, 1);
+      // Bar
+      ctx.fillStyle = `rgba(255,92,92,${0.14 + (N_ABOVE - row.idx)*0.02})`;
+      ctx.shadowColor = '#ff5c5c'; ctx.shadowBlur = 2;
+      ctx.fillRect(BAR_X, ry + 5, barW2, rh - 10);
+      ctx.shadowBlur = 0;
+      // Price
+      ctx.font = '500 12px "JetBrains Mono"'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,92,92,0.65)';
+      ctx.fillText(d.price.toLocaleString(), PRICE_END_X, ry + rh * 0.5);
+      // Size
+      ctx.fillStyle = 'rgba(238,240,248,0.3)';
+      ctx.fillText(d.size.toFixed(1), SIZE_END_X, ry + rh * 0.5);
+
+    } else if (row.type === 'spoof') {
+      const spoofSize = SPOOF_SIZE_MAX * wallGrowth;
+      const barW2     = bw(spoofSize);
+      const midY      = ry + rh * 0.5;
+
+      // BG — intense red
+      ctx.fillStyle = `rgba(200,20,20,${wallGrowth * 0.16})`;
+      ctx.fillRect(OB_X, ry, OB_W, rh);
+
+      // Layered glow bar
+      if (wallGrowth > 0.05) {
+        const grad = ctx.createLinearGradient(BAR_X, 0, BAR_X + BAR_MAX_W, 0);
+        grad.addColorStop(0, `rgba(255,50,50,${wallGrowth * 0.42})`);
+        grad.addColorStop(0.8, `rgba(255,90,30,${wallGrowth * 0.28})`);
+        grad.addColorStop(1, 'rgba(255,80,30,0.05)');
+        ctx.shadowColor = '#ff3030'; ctx.shadowBlur = 18 * wallGrowth * pulse;
+        ctx.fillStyle = grad;
+        ctx.fillRect(BAR_X, ry + 3, barW2, rh - 6);
+        ctx.shadowBlur = 0;
+        // Inner bright core
+        ctx.fillStyle = `rgba(255,100,100,${wallGrowth * 0.28 * pulse})`;
+        ctx.fillRect(BAR_X, ry + 3, barW2 * 0.55, rh - 6);
+      }
+
+      // Left accent bar
+      ctx.fillStyle = `rgba(255,60,60,${wallGrowth * 0.95})`;
+      ctx.fillRect(OB_X, ry, 3, rh);
+
+      // Price label
+      ctx.font = `${wallGrowth > 0.4 ? '700' : '500'} 12px "JetBrains Mono"`;
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      const pcol = `rgba(255,${Math.round(80 + wallGrowth * 60)},80,${0.7 + wallGrowth * 0.3})`;
+      if (wallGrowth > 0.15) { ctx.shadowColor = '#ff5c5c'; ctx.shadowBlur = 7 * wallGrowth; }
+      ctx.fillStyle = pcol;
+      ctx.fillText(SPOOF_PRICE.toLocaleString(), PRICE_END_X, midY);
+      ctx.shadowBlur = 0;
+
+      // Size — morphs from normal to HUGE
+      const displaySize = wallGrowth < 0.5
+        ? SPOOF_SIZE_NORMAL
+        : SPOOF_SIZE_NORMAL + (SPOOF_SIZE_MAX - SPOOF_SIZE_NORMAL) * ((wallGrowth - 0.5) / 0.5);
+      ctx.font = `700 ${10 + Math.round(wallGrowth * 5)}px "JetBrains Mono"`;
+      ctx.textAlign = 'right';
+      ctx.fillStyle = wallGrowth > 0.5
+        ? `rgba(255,200,200,${0.6 + wallGrowth * 0.4})`
+        : 'rgba(238,240,248,0.45)';
+      if (wallGrowth > 0.45) { ctx.shadowColor = '#ff5c5c'; ctx.shadowBlur = 9 * wallGrowth * pulse; }
+      const szStr = wallGrowth > 0.45
+        ? Math.round(displaySize).toLocaleString() + ' BTC'
+        : displaySize.toFixed(1) + ' BTC';
+      ctx.fillText(szStr, SIZE_END_X, midY);
+      ctx.shadowBlur = 0;
+
+      // "ФАНТОМНЫЙ ОРДЕР" label (appears at ~60% growth)
+      if (wallGrowth > 0.55 && rh > 52) {
+        const labelAlpha = Math.min(1, (wallGrowth - 0.55) / 0.2);
+        ctx.font = `800 ${Math.round(11 + wallGrowth * 6)}px Inter`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = `rgba(255,200,60,${labelAlpha * pulse})`;
+        ctx.shadowColor = '#f5c842'; ctx.shadowBlur = 10 * wallGrowth;
+        ctx.fillText('⚠  ФАНТОМНЫЙ ОРДЕР', CX, ry + rh * 0.36);
+        ctx.shadowBlur = 0;
+
+        if (wallGrowth > 0.82 && rh > 72) {
+          const hintA = Math.min(1, (wallGrowth - 0.82) / 0.18) * pulse * 0.6;
+          ctx.font = '600 10px Inter';
+          ctx.fillStyle = `rgba(255,120,120,${hintA})`;
+          ctx.fillText('исчезнет — цена развернётся вверх', CX, ry + rh * 0.66);
+        }
+      }
+
+      // Pulsing border
+      if (wallGrowth > 0.7) {
+        const ba = (wallGrowth - 0.7) / 0.3 * 0.55 * pulse;
+        ctx.strokeStyle = `rgba(255,60,60,${ba})`;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(OB_X + 1, ry + 1, OB_W - 2, rh - 2);
+      }
+
+    } else if (row.type === 'spread') {
+      const curP     = genPrice(frameN);
+      const inRocket = (frameN % CYCLE) / CYCLE > PH_ACTIVE && (frameN % CYCLE) / CYCLE < PH_ROCKET;
+      ctx.fillStyle = `rgba(245,200,66,0.055)`;
+      ctx.fillRect(OB_X, ry, OB_W, rh);
+      // Center line
+      ctx.fillStyle = inRocket ? 'rgba(50,220,130,0.18)' : 'rgba(245,200,66,0.14)';
+      ctx.fillRect(OB_X, ry + Math.floor(rh * 0.5), OB_W, 1);
+      // Price label
+      ctx.font = '700 15px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = inRocket ? '#32dc82' : '#f5c842';
+      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 10;
+      ctx.fillText(curP.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}), CX, ry + rh * 0.5);
+      ctx.shadowBlur = 0;
+      // Arrow
+      if (inRocket || wallGrowth > 0.28) {
+        ctx.font = '700 12px Inter';
+        ctx.fillStyle = inRocket ? '#32dc82' : 'rgba(255,92,92,0.8)';
+        ctx.textAlign = 'left';
+        ctx.fillText(inRocket ? '  ▲' : '  ▼', CX + 56, ry + rh * 0.5);
+      }
+
+    } else if (row.type === 'bid') {
+      const d = row.data, barW2 = bw(d.size);
+      ctx.fillStyle = `rgba(50,220,130,${0.020 + row.idx * 0.005})`;
+      ctx.fillRect(OB_X, ry, OB_W, rh);
+      ctx.fillStyle = 'rgba(255,255,255,0.025)';
+      ctx.fillRect(OB_X, ry + rh - 1, OB_W, 1);
+      ctx.fillStyle = `rgba(50,220,130,0.12)`;
+      ctx.shadowColor = '#32dc82'; ctx.shadowBlur = 2;
+      ctx.fillRect(BAR_X, ry + 5, barW2, rh - 10);
+      ctx.shadowBlur = 0;
+      ctx.font = '500 12px "JetBrains Mono"'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(50,220,130,0.62)';
+      ctx.fillText(d.price.toLocaleString(), PRICE_END_X, ry + rh * 0.5);
+      ctx.fillStyle = 'rgba(238,240,248,0.3)';
+      ctx.fillText(d.size.toFixed(1), SIZE_END_X, ry + rh * 0.5);
+    }
+  }
+
+  // Outer border
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  ctx.strokeRect(OB_X, OB_TOP, OB_W, totalH);
+  // Price col separator
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(BAR_X - 8, OB_TOP); ctx.lineTo(BAR_X - 8, OB_TOP + totalH); ctx.stroke();
+}
+
+// ══════════════════════════
+//  DRAW: Traders
+// ══════════════════════════
+function drawTraders() {
+  const t        = (frameN % CYCLE) / CYCLE;
+  const wallOn   = wallGrowth > 0.18;
+  const afterV   = t > PH_ACTIVE && t < PH_ROCKET + 0.04;
+  for (const tr of traders) {
+    const p     = 0.5 + 0.5 * Math.sin(frameN * 0.09 + tr.x * 0.05);
+    let col     = tr.col, alpha = tr.baseAlpha;
+    if (wallOn)       { col = '#ff5c5c'; alpha = tr.baseAlpha * 0.8 + 0.12; }
+    else if (afterV)  { col = '#32dc82'; alpha = tr.baseAlpha + 0.16; }
+    ctx.beginPath(); ctx.arc(tr.x, tr.y, tr.r, 0, Math.PI*2);
+    ctx.fillStyle = col; ctx.globalAlpha = alpha * p;
+    ctx.shadowColor = col; ctx.shadowBlur = 5;
+    ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    // Trail for fast movers
+    if (wallOn && Math.abs(tr.vy) > 0.45) {
+      ctx.beginPath(); ctx.moveTo(tr.x, tr.y); ctx.lineTo(tr.x - tr.vx*7, tr.y - tr.vy*7);
+      ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = alpha * 0.28;
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+}
+
+// ══════════════════════════
+//  DRAW: Price chart
+// ══════════════════════════
+function drawPriceChart() {
+  const t       = (frameN % CYCLE) / CYCLE;
+  const inRocket = t > PH_ACTIVE && t < PH_ROCKET;
+  const wallOn  = wallGrowth > 0.25;
+  const pY = (v) => CHART_TOP + CHART_H - Math.max(0, Math.min(1, (v - P_MIN)/(P_MAX - P_MIN))) * CHART_H;
+
+  ctx.fillStyle = '#070b16'; ctx.fillRect(CHART_X, CHART_TOP, CHART_W, CHART_H);
+  ctx.save(); ctx.beginPath(); ctx.rect(CHART_X, CHART_TOP, CHART_W, CHART_H); ctx.clip();
+
+  // Grid
+  for (let v = P_MIN; v <= P_MAX; v += 30) {
+    const y = pY(v);
+    ctx.beginPath(); ctx.moveTo(CHART_X, y); ctx.lineTo(CHART_X+CHART_W, y);
+    ctx.strokeStyle = v === P_BASE ? 'rgba(245,200,66,0.1)' : 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 0.8;
+    if (v === P_BASE) ctx.setLineDash([6,8]);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  // Scanlines
+  ctx.fillStyle = 'rgba(0,0,0,0.044)';
+  for (let sy = CHART_TOP; sy < CHART_TOP+CHART_H; sy+=3) ctx.fillRect(CHART_X, sy, CHART_W, 1.2);
+
+  // Fill
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) { const y=pY(prcHist[i]); i===0?ctx.moveTo(CHART_X+i,y):ctx.lineTo(CHART_X+i,y); }
+  ctx.lineTo(CHART_X+N_PTS-1, CHART_TOP+CHART_H); ctx.lineTo(CHART_X, CHART_TOP+CHART_H); ctx.closePath();
+  const fill = ctx.createLinearGradient(0, CHART_TOP, 0, CHART_TOP+CHART_H);
+  if (inRocket) { fill.addColorStop(0,'rgba(50,220,130,0.15)'); fill.addColorStop(1,'rgba(50,220,130,0.01)'); }
+  else if (wallOn) { fill.addColorStop(0,'rgba(255,92,92,0.10)'); fill.addColorStop(1,'rgba(255,92,92,0.01)'); }
+  else { fill.addColorStop(0,'rgba(238,240,248,0.05)'); fill.addColorStop(1,'rgba(238,240,248,0.01)'); }
+  ctx.fillStyle = fill; ctx.fill();
+
+  // Line
+  const lCol = inRocket ? '#32dc82' : wallOn ? '#ff5c5c' : 'rgba(238,240,248,0.68)';
+  ctx.beginPath();
+  for (let i = 0; i < N_PTS; i++) { const y=pY(prcHist[i]); i===0?ctx.moveTo(CHART_X+i,y):ctx.lineTo(CHART_X+i,y); }
+  ctx.strokeStyle = lCol; ctx.lineWidth = inRocket ? 2.5 : 1.9;
+  ctx.shadowColor = lCol; ctx.shadowBlur = inRocket ? 18 : wallOn ? 6 : 3;
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  ctx.restore();
+  ctx.strokeStyle = inRocket?'rgba(50,220,130,0.2)':wallOn?'rgba(255,92,92,0.14)':'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1; ctx.strokeRect(CHART_X, CHART_TOP, CHART_W, CHART_H);
+
+  // Title
+  ctx.font='700 10px Inter'; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillStyle= inRocket?'rgba(50,220,130,0.38)':wallOn?'rgba(255,92,92,0.3)':'rgba(238,240,248,0.18)';
+  ctx.fillText('ЦЕНА  BTC/USDT', CHART_X+8, CHART_TOP+6);
+
+  // Live dot
+  const lv = prcHist[N_PTS-1], lvY = pY(lv);
+  ctx.beginPath(); ctx.arc(CHART_X+CHART_W-1, lvY, 5, 0, Math.PI*2);
+  ctx.fillStyle=lCol; ctx.shadowColor=lCol; ctx.shadowBlur=10; ctx.fill(); ctx.shadowBlur=0;
+  ctx.beginPath(); ctx.arc(CHART_X+CHART_W-1, lvY, 2, 0, Math.PI*2);
+  ctx.fillStyle='#fff'; ctx.fill();
+
+  // Price label
+  ctx.font='700 12px Inter'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  ctx.fillStyle=lCol; ctx.shadowColor=lCol; ctx.shadowBlur=6;
+  ctx.fillText(lv.toFixed(2), CHART_X+CHART_W-10, lvY-14);
+  ctx.shadowBlur=0;
+}
+
+// ══════════════════════════
+//  DRAW MAIN
+// ══════════════════════════
+function draw() {
+  const sx = shakeAmt > 0 ? rnd(-shakeAmt, shakeAmt) : 0;
+  const sy = shakeAmt > 0 ? rnd(-shakeAmt, shakeAmt) : 0;
+
+  ctx.save(); ctx.translate(sx, sy);
+
+  ctx.fillStyle = '#08090f'; ctx.fillRect(-30, -30, W+60, H+60);
+
+  for (const d of bgDots) {
+    ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2);
+    ctx.fillStyle=d.col; ctx.globalAlpha=d.a; ctx.fill(); ctx.globalAlpha=1;
+  }
+
+  drawOrderbook();
+  drawTraders();
+  drawPriceChart();
+
+  // Rings
+  for (const rg of rings) {
+    ctx.beginPath(); ctx.arc(rg.x, rg.y, rg.r, 0, Math.PI*2);
+    ctx.strokeStyle=rg.col; ctx.lineWidth=rg.life*(rg.thick?4.5:2);
+    ctx.globalAlpha=rg.life*0.68; ctx.shadowColor=rg.col; ctx.shadowBlur=12;
+    ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  // Lightnings
+  for (const l of lightnings) drawLightning(l.x1, l.y1, l.x2, l.y2, l.col, l.life*0.84, l.thick?2.1:1.4);
+
+  // Particles
+  for (const p of parts) {
+    ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.3, p.r*p.life), 0, Math.PI*2);
+    ctx.fillStyle=p.col; ctx.globalAlpha=p.life; ctx.shadowColor=p.col; ctx.shadowBlur=5;
+    ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  // Sparks
+  for (const s of sparks) {
+    const ex=s.x-s.vx*s.len*(0.4+s.life*0.6), ey=s.y-s.vy*s.len*(0.4+s.life*0.6);
+    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(ex,ey);
+    ctx.strokeStyle=s.col; ctx.lineWidth=s.life*2.1; ctx.globalAlpha=s.life*0.82;
+    ctx.shadowColor=s.col; ctx.shadowBlur=5; ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  // Flashes
+  for (const f of flashes) {
+    const prog=1-f.life;
+    ctx.beginPath(); ctx.arc(f.x, f.y, 4+prog*72, 0, Math.PI*2);
+    ctx.fillStyle=`rgba(255,80,80,${f.life*0.36})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(f.x, f.y, 2+prog*22, 0, Math.PI*2);
+    ctx.fillStyle=`rgba(255,210,200,${f.life*0.85})`; ctx.fill();
+  }
+
+  // Float numbers
+  for (const fn of floatNums) {
+    ctx.font=fn.big?`900 ${Math.round(16+fn.life*7)}px Inter`:'800 14px Inter';
+    ctx.fillStyle=fn.col; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.globalAlpha=fn.life; ctx.shadowColor=fn.col; ctx.shadowBlur=fn.big?20:8;
+    ctx.fillText(fn.text, fn.x, fn.y); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  ctx.restore();
+
+  // Screen flash
+  if (screenFlash > 0) {
+    if (screenFlash > 0.8) {
+      ctx.fillStyle=`rgba(255,255,255,${(screenFlash-0.8)*0.46})`;
+      ctx.fillRect(0,0,W,H);
+    }
+    ctx.fillStyle=`rgba(255,60,60,${Math.min(1,screenFlash)*0.22})`;
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+initTraders();
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+</script>
+</body>
+</html>

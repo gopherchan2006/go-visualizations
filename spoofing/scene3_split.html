@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spoofing Scene 3 — Разделённый экран</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body { background:#030405; display:flex; justify-content:center; align-items:center; min-height:100vh; font-family:'Inter',sans-serif; }
+.frame { width:540px; height:960px; position:relative; overflow:hidden; background:#08090f; border:1px solid rgba(255,255,255,0.06); border-radius:4px; box-shadow:0 0 80px rgba(0,0,0,0.9); }
+canvas { position:absolute; top:0; left:0; width:540px; height:960px; z-index:1; }
+
+/* ── Top header ── */
+.top-bar {
+  position:absolute; top:0; left:0; right:0; z-index:4;
+  height:64px; display:flex; align-items:center; justify-content:center;
+  background:rgba(8,9,15,0.97); border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.tb-pair { font-size:20px; font-weight:800; color:#eef0f8; letter-spacing:0.2px; }
+.tb-pair em { color:rgba(238,240,248,0.25); font-style:normal; }
+.tb-price { font-size:26px; font-weight:900; letter-spacing:-1px; transition:color 0.3s; }
+.tb-sep { width:1px; height:32px; background:rgba(255,255,255,0.06); margin:0 20px; }
+.spoof-tag {
+  padding:4px 11px; border-radius:7px;
+  background:rgba(255,92,92,0.1); border:1px solid rgba(255,92,92,0.32);
+  font-size:10px; font-weight:800; letter-spacing:1.5px; color:#ff5c5c;
+  text-shadow:0 0 8px rgba(255,92,92,0.7);
+  animation:spfPulse 1.2s ease-in-out infinite;
+  margin-left:16px;
+}
+@keyframes spfPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+/* ── Divider ── */
+.divider {
+  position:absolute; top:64px; left:50%; transform:translateX(-50%);
+  width:2px; height:calc(100% - 64px); z-index:5;
+  background:rgba(255,255,255,0.06);
+}
+.divider-label {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:6; white-space:nowrap;
+  padding:5px 10px; border-radius:8px;
+  background:rgba(8,9,15,0.95); border:1px solid rgba(255,255,255,0.07);
+  font-size:9px; font-weight:800; letter-spacing:2px; color:rgba(238,240,248,0.15);
+  writing-mode:vertical-rl; text-orientation:mixed;
+}
+
+/* ── Side labels ── */
+.side-label {
+  position:absolute; top:72px; z-index:4;
+  padding:6px 13px; border-radius:0 0 10px 0;
+  font-size:9px; font-weight:800; letter-spacing:2px; text-transform:uppercase;
+}
+.side-label.whale {
+  left:0; background:rgba(50,220,130,0.07); border-right:1px solid rgba(50,220,130,0.15); border-bottom:1px solid rgba(50,220,130,0.15);
+  color:rgba(50,220,130,0.5);
+}
+.side-label.trader {
+  right:0; background:rgba(255,92,92,0.07); border-left:1px solid rgba(255,92,92,0.15); border-bottom:1px solid rgba(255,92,92,0.15);
+  color:rgba(255,92,92,0.5); border-radius:0 0 0 10px;
+}
+
+/* ── Bottom PnL bar ── */
+.pnl-bar {
+  position:absolute; bottom:0; left:0; right:0; z-index:4;
+  height:88px; display:flex;
+  background:rgba(8,9,15,0.98); border-top:1px solid rgba(255,255,255,0.05);
+}
+.pnl-side {
+  flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 20px; gap:2px;
+}
+.pnl-side.left { border-right:1px solid rgba(255,255,255,0.04); }
+.pnl-lbl { font-size:9px; font-weight:700; color:#1a2235; letter-spacing:1.8px; text-transform:uppercase; }
+.pnl-val { font-size:30px; font-weight:900; letter-spacing:-1px; line-height:1; }
+.pnl-val.g { color:#32dc82; text-shadow:0 0 16px rgba(50,220,130,0.5); }
+.pnl-val.r { color:#ff5c5c; text-shadow:0 0 16px rgba(255,92,92,0.4); }
+.pnl-sub { font-size:10px; font-weight:500; color:#1a2235; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <div class="top-bar">
+    <div class="tb-pair">BTC<em>/USDT</em></div>
+    <div class="tb-sep"></div>
+    <div class="tb-price" id="tbPrice">65,230.00</div>
+    <div class="spoof-tag" id="spfTag">⚠ SPOOF</div>
+  </div>
+
+  <div class="side-label whale">КИТ</div>
+  <div class="side-label trader">ТРЕЙДЕР</div>
+  <div class="divider"></div>
+
+  <div class="pnl-bar">
+    <div class="pnl-side left">
+      <div class="pnl-lbl">Баланс кита</div>
+      <div class="pnl-val g" id="whalePnl">$800,000</div>
+      <div class="pnl-sub" id="whaleSub">позиция закрыта</div>
+    </div>
+    <div class="pnl-side">
+      <div class="pnl-lbl">Баланс трейдера</div>
+      <div class="pnl-val r" id="traderPnl">$10,000</div>
+      <div class="pnl-sub" id="traderSub">держит позицию</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 540, H = 960;
+const MX = 270;  // center divider x
+const TOP = 64, BOT = H - 88;
+const CH = BOT - TOP; // canvas working area height = 808
+
+// ── Cycle ──
+const CYCLE = 680;
+// Phase thresholds
+const PH_SETUP_E  = 0.12;   // 0–12%: calm, кит наблюдает
+const PH_FAKEBID  = 0.14;   // кит ставит фейк заявку (кнопка появляется)
+const PH_WALL_E   = 0.45;   // 14–45%: фейковая стена живёт, цена растёт, трейдер покупает
+const PH_CANCEL   = 0.47;   // кит жмёт CANCEL
+const PH_SELL     = 0.55;   // кит жмёт SELL
+const PH_CRASH_E  = 0.80;   // 55–80%: цена рушится, трейдер в убытке
+const PH_END      = 1.00;   // итоги
+
+// Starting balances
+const WHALE_START  = 800000;
+const TRADER_START = 10000;
+
+function rnd(a,b) { return a + Math.random()*(b-a); }
+function lerp(a,b,t) { return a + (b-a)*t; }
+function smooth(t) { return t*t*(3-2*t); }
+function easeOut(t) { return 1-(1-t)*(1-t); }
+
+// ── Price model ──
+const P_BASE   = 65230;
+const P_PEAK   = 65386;  // +$156 during spoof
+const P_CRASH  = 65118;  // -$112 after cancel
+function getPrice(f) {
+  const t = (f % CYCLE) / CYCLE;
+  const n = Math.sin(f*0.09)*1.2;
+  if (t < PH_SETUP_E)  return P_BASE + n;
+  if (t < PH_WALL_E) {
+    const p = smooth((t - PH_SETUP_E) / (PH_WALL_E - PH_SETUP_E));
+    return lerp(P_BASE, P_PEAK, p) + n;
+  }
+  if (t < PH_SELL)     return P_PEAK + n;
+  if (t < PH_CRASH_E) {
+    const p = easeOut((t - PH_SELL) / (PH_CRASH_E - PH_SELL));
+    return lerp(P_PEAK, P_CRASH, p) + n;
+  }
+  const p = (t - PH_CRASH_E) / (PH_END - PH_CRASH_E);
+  return P_CRASH + p*14 + n;
+}
+
+// Price history
+const N_HIST = 380;
+let priceHist = new Array(N_HIST).fill(P_BASE);
+
+// ── State ──
+let frameN = 0;
+let whaleBal    = WHALE_START;
+let traderBal   = TRADER_START;
+let traderBTC   = 0;
+let traderEntry = 0;
+let screenFlash = 0, shakeAmt = 0;
+let lastCycle   = -1;
+
+// ── Buttons ──
+// Left side (whale): FAKE BID, CANCEL, SELL
+// Each button: x,y,w,h,label,state (idle/hover/pressed/done/hidden),alpha,pressAnim
+const WL = 22, WR = MX - 16;
+const BTN_W = (WR - WL - 12) / 2;
+const BTN_H = 42;
+
+let btnFakeBid = { x: WL, y: 0, w: WR-WL, h: BTN_H, label:'FAKE BID  8,540 BTC', state:'hidden', pressAnim:0, doneAnim:0, col:'#f5c842' };
+let btnCancel  = { x: WL, y: 0, w: (WR-WL-10)/2, h: BTN_H, label:'CANCEL', state:'hidden', pressAnim:0, doneAnim:0, col:'#ff5c5c' };
+let btnSell    = { x: WL + (WR-WL-10)/2+10, y: 0, w: (WR-WL-10)/2, h: BTN_H, label:'SELL 142 BTC', state:'hidden', pressAnim:0, doneAnim:0, col:'#ff9030' };
+
+// ── Effects ──
+let parts = [], sparks = [], rings = [], floatNums = [], flashes = [], lightnings = [];
+let bgDots = [];
+for (let i=0;i<30;i++) bgDots.push({x:rnd(0,W),y:rnd(0,H),vx:rnd(-0.04,0.04),vy:rnd(-0.05,0.05),r:rnd(0.3,1.4),a:rnd(0.015,0.05),col:i%2===0?'#32dc82':'#ff5c5c'});
+
+function drawLightning(x1,y1,x2,y2,col,alpha,w) {
+  const pts=[{x:x1,y:y1}];
+  for(let i=1;i<6;i++){const tt=i/6;pts.push({x:x1+(x2-x1)*tt+rnd(-12,12),y:y1+(y2-y1)*tt+rnd(-8,8)});}
+  pts.push({x:x2,y:y2});
+  ctx.save();ctx.globalAlpha=Math.max(0,alpha);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.shadowColor=col;ctx.shadowBlur=10;
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.stroke();
+  ctx.strokeStyle='#fff';ctx.lineWidth=w*0.3;ctx.shadowBlur=3;
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.stroke();
+  ctx.restore();
+}
+
+function triggerCancelFX() {
+  screenFlash = 1.0; shakeAmt = 8;
+  // Red wall disintegrate particles
+  for(let i=0;i<50;i++){
+    const a=rnd(0,Math.PI*2), s=rnd(2,14);
+    parts.push({x:rnd(WL+10,MX-26),y:rnd(TOP+120,TOP+260),vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(2,6),life:1,col:i<30?'#ff5c5c':'#f5c842'});
+  }
+  for(let i=0;i<16;i++){
+    sparks.push({x:MX*0.5,y:TOP+190,vx:rnd(-10,10),vy:rnd(-12,4),life:1,len:rnd(10,28),col:i%2===0?'#ff5c5c':'#f5c842'});
+  }
+  rings.push({x:MX*0.5,y:TOP+190,r:4,maxR:200,life:1,col:'#ff5c5c',thick:true});
+  floatNums.push({x:MX*0.5,y:TOP+160,text:'ОТМЕНЁН!',life:1.4,vy:-1.6,col:'#ff5c5c',big:true});
+}
+
+function triggerSellFX() {
+  screenFlash = 1.2; shakeAmt = 10;
+  const whalePnl = whaleBal - WHALE_START;
+  for(let i=0;i<60;i++){
+    const a=rnd(-Math.PI*0.9,0.1), s=rnd(4,18);
+    parts.push({x:MX*0.5+rnd(-20,20),y:TOP+380,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(2,8),life:1,col:i<40?'#32dc82':'#f5c842'});
+  }
+  for(let i=0;i<20;i++){
+    sparks.push({x:MX*0.5,y:TOP+380,vx:rnd(-14,14),vy:rnd(-18,2),life:1,len:rnd(12,36),col:i%2===0?'#32dc82':'#f5c842'});
+  }
+  rings.push({x:MX*0.5,y:TOP+380,r:4,maxR:260,life:1,col:'#32dc82',thick:true});
+  for(let i=1;i<=3;i++) setTimeout(()=>rings.push({x:MX*0.5,y:TOP+380,r:4,maxR:80+i*60,life:1,col:i%2===0?'#f5c842':'#32dc82',thick:false}),i*100);
+  for(let i=0;i<4;i++) lightnings.push({x1:MX*0.5,y1:TOP+380,x2:MX*0.5+rnd(-60,60),y2:TOP+380-rnd(80,200),life:1.2,col:i<2?'#32dc82':'#f5c842'});
+  flashes.push({x:MX*0.5,y:TOP+380,life:1});
+  const profit = Math.round(whalePnl);
+  floatNums.push({x:MX*0.5,y:TOP+340,text:'+$'+profit.toLocaleString(),life:1.6,vy:-1.4,col:'#32dc82',big:true});
+}
+
+function triggerCrashFX() {
+  for(let i=0;i<30;i++){
+    const a=rnd(0,Math.PI), s=rnd(2,10);
+    parts.push({x:rnd(MX+16,W-20),y:rnd(TOP+200,TOP+360),vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(1.5,5),life:1,col:'#ff5c5c'});
+  }
+  rings.push({x:(MX+W)*0.5,y:TOP+280,r:4,maxR:150,life:1,col:'#ff5c5c',thick:false});
+  floatNums.push({x:(MX+W)*0.5,y:TOP+240,text:'СЛИТ!',life:1.4,vy:-1.2,col:'#ff5c5c',big:true});
+}
+
+// ── Orderbook data (left side, whale) ──
+// Fake bid row: appears/grows with wall, disappears on cancel
+function getOrderbookRows(t) {
+  const wallActive = t >= PH_SETUP_E && t < PH_CANCEL;
+  const wallGrow   = t < PH_FAKEBID ? 0 : Math.min(1, (t - PH_FAKEBID) / (PH_WALL_E - PH_FAKEBID));
+  const askRows = [
+    { price: 65420, size: 18.4, type: 'ask' },
+    { price: 65390, size: 42.1, type: 'ask' },
+    { price: 65360, size: 31.7, type: 'ask' },
+    { price: 65320, size: 87.3, type: 'ask' },
+  ];
+  const bidRows = [
+    { price: 65230, size: 12.8, type: 'bid' },
+    { price: 65210, size: 55.2, type: 'bid' },
+    { price: 65180, size: 29.6, type: 'bid' },
+  ];
+  const fakeRow = wallActive
+    ? { price: 65200, size: Math.round(8540 * wallGrow), type: 'fake', grow: wallGrow }
+    : null;
+  return { askRows, bidRows, fakeRow };
+}
+
+// ── Trader actions (right side) ──
+// Trader "buys" when price is rising, panics when price crashes
+let traderBuyFlash  = 0;
+let traderLossFlash = 0;
+
+// ── Layout constants ──
+const OB_X = WL, OB_W = MX - WL - 16;
+const OB_TOP = TOP + 108, OB_ROW_H = 38;
+const CHART_TOP_L = TOP + 490, CHART_H_L = 140;
+const CHART_TOP_R = TOP + 140, CHART_H_R = 260;
+const TR_OB_X = MX + 16, TR_OB_W = W - TR_OB_X - 16;
+
+// ── Update ──
+let cancelFired = false, sellFired = false, crashFired = false;
+let lastCycleId = -1;
+
+function update() {
+  frameN++;
+  const cf = frameN % CYCLE;
+  const ci = Math.floor(frameN / CYCLE);
+  const t  = cf / CYCLE;
+  const price = getPrice(frameN);
+
+  priceHist.push(price); priceHist.shift();
+
+  // Reset per cycle
+  if (ci !== lastCycleId) {
+    lastCycleId = ci;
+    cancelFired = false; sellFired = false; crashFired = false;
+    btnFakeBid.state = 'hidden'; btnFakeBid.pressAnim = 0; btnFakeBid.doneAnim = 0;
+    btnCancel.state  = 'hidden'; btnCancel.pressAnim  = 0; btnCancel.doneAnim  = 0;
+    btnSell.state    = 'hidden'; btnSell.pressAnim    = 0; btnSell.doneAnim    = 0;
+    traderBTC   = 0; traderEntry = 0;
+    whaleBal    = WHALE_START; traderBal = TRADER_START;
+  }
+
+  // ── Button states ──
+  const btnY = TOP + 56;
+  btnFakeBid.y = btnY; btnCancel.y = btnY + BTN_H + 8; btnSell.y = btnY + BTN_H + 8;
+
+  if (t >= PH_SETUP_E && t < PH_WALL_E) {
+    if (btnFakeBid.state === 'hidden') btnFakeBid.state = 'hover';
+    if (t >= PH_FAKEBID && btnFakeBid.state === 'hover') btnFakeBid.state = 'pressed';
+    btnFakeBid.pressAnim = Math.min(1, btnFakeBid.pressAnim + 0.06);
+  }
+  if (t >= PH_WALL_E) {
+    btnFakeBid.state = 'done';
+    btnCancel.state  = btnCancel.state === 'hidden' ? 'hover' : btnCancel.state;
+    btnSell.state    = btnSell.state === 'hidden'   ? 'idle'  : btnSell.state;
+  }
+  if (t >= PH_CANCEL && !cancelFired) {
+    cancelFired = true;
+    btnCancel.state = 'pressed'; btnCancel.pressAnim = 0;
+    triggerCancelFX();
+  }
+  if (t >= PH_SELL && !sellFired) {
+    sellFired = true;
+    btnCancel.state = 'done'; btnSell.state = 'pressed'; btnSell.pressAnim = 0;
+    // Whale sells 142 BTC at peak ~65386, calculates rough profit vs fake cancellation at 65200
+    whaleBal = WHALE_START + 142 * (P_PEAK - P_BASE) * 0.65; // simplified profit
+    triggerSellFX();
+  }
+  if (t >= PH_CRASH_E && !crashFired) {
+    crashFired = true;
+    if (traderBTC > 0) {
+      traderBal = TRADER_START - traderBTC * (price - traderEntry);
+      triggerCrashFX();
+    }
+  }
+
+  // Button anim decay
+  for (const b of [btnFakeBid, btnCancel, btnSell]) {
+    if (b.state === 'pressed') b.pressAnim = Math.min(1, b.pressAnim + 0.08);
+    b.doneAnim = Math.min(1, b.doneAnim + 0.04);
+  }
+
+  // Trader buys during rising phase
+  if (t >= PH_FAKEBID + 0.08 && t < PH_CANCEL && traderBTC === 0) {
+    traderBTC   = 0.32 + rnd(0, 0.1); // buys ~0.35 BTC
+    traderEntry = price;
+    traderBuyFlash = 1;
+  }
+
+  // Trader PnL live update
+  if (traderBTC > 0 && t < PH_CRASH_E) {
+    traderBal = TRADER_START + traderBTC * (price - traderEntry);
+  }
+
+  // Decay
+  cancelFired = cancelFired;
+  traderBuyFlash  = Math.max(0, traderBuyFlash  - 0.04);
+  traderLossFlash = Math.max(0, traderLossFlash - 0.04);
+  if (shakeAmt > 0) { shakeAmt *= 0.72; if (shakeAmt < 0.2) shakeAmt = 0; }
+  if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - 0.038);
+
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vx*=0.91;p.vy*=0.91;p.life-=0.024;if(p.life<=0)parts.splice(i,1);}
+  for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.x+=s.vx;s.y+=s.vy;s.vx*=0.88;s.vy*=0.88;s.life-=0.034;if(s.life<=0)sparks.splice(i,1);}
+  for(let i=rings.length-1;i>=0;i--){const r=rings[i];r.r+=(r.maxR-r.r)*0.085;r.life-=0.022;if(r.life<=0)rings.splice(i,1);}
+  for(let i=flashes.length-1;i>=0;i--){flashes[i].life-=0.05;if(flashes[i].life<=0)flashes.splice(i,1);}
+  for(let i=lightnings.length-1;i>=0;i--){lightnings[i].life-=0.11;if(lightnings[i].life<=0)lightnings.splice(i,1);}
+  for(let i=floatNums.length-1;i>=0;i--){const fn=floatNums[i];fn.y+=fn.vy;fn.vy*=0.97;fn.life-=0.016;if(fn.life<=0)floatNums.splice(i,1);}
+  for(const d of bgDots){d.x+=d.vx;d.y+=d.vy;if(d.x<0)d.x=W;if(d.x>W)d.x=0;if(d.y<0)d.y=H;if(d.y>H)d.y=0;}
+
+  // ── DOM ──
+  const price2 = getPrice(frameN);
+  const pEl = document.getElementById('tbPrice');
+  const inRock = t >= PH_SELL && t < PH_CRASH_E;
+  const wallOn = t >= PH_FAKEBID && t < PH_CANCEL;
+  const crashed = t >= PH_CRASH_E;
+  pEl.textContent = price2.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  pEl.style.color = inRock ? '#ff9030' : wallOn ? '#32dc82' : crashed ? '#ff5c5c' : '#eef0f8';
+
+  document.getElementById('spfTag').textContent = wallOn ? '⚠ SPOOF ACTIVE' : crashed ? '✓ SPOOF CAUGHT' : '⚠ SPOOF';
+
+  const wEl = document.getElementById('whalePnl');
+  const wd = whaleBal - WHALE_START;
+  wEl.textContent = '$' + Math.round(whaleBal).toLocaleString();
+  wEl.className   = 'pnl-val ' + (wd > 100 ? 'g' : 'r');
+  document.getElementById('whaleSub').textContent = wd > 100 ? `+$${Math.round(wd).toLocaleString()} профит` : 'ждёт момента';
+
+  const tEl = document.getElementById('traderPnl');
+  const td = traderBal - TRADER_START;
+  tEl.textContent = '$' + Math.round(traderBal).toLocaleString();
+  tEl.className   = 'pnl-val ' + (td >= 0 ? 'g' : 'r');
+  document.getElementById('traderSub').textContent = traderBTC > 0
+    ? (td >= 0 ? `+$${Math.round(td).toLocaleString()} нереализованная прибыль` : `-$${Math.abs(Math.round(td)).toLocaleString()} убыток`)
+    : 'не в позиции';
+}
+
+// ══════════════════════════
+//  DRAW helpers
+// ══════════════════════════
+
+function drawPanel(x, y, w, h, col, alpha) {
+  ctx.fillStyle = `rgba(${col},${alpha})`;
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
+}
+
+function drawBtn(btn) {
+  if (btn.state === 'hidden') return;
+  const {x, y, w, h, label, state, pressAnim, col} = btn;
+  const pressed = state === 'pressed';
+  const done    = state === 'done';
+  const hover   = state === 'hover';
+  const idle    = state === 'idle';
+
+  let bgAlpha = hover ? 0.18 : pressed ? 0.32 : done ? 0.08 : 0.06;
+  let borderA = hover ? 0.5 : pressed ? 0.9 : done ? 0.12 : 0.08;
+  let scale   = pressed ? (1 - pressAnim * 0.04) : 1;
+  let pulse   = (hover || pressed) ? 0.7 + 0.3 * Math.sin(frameN * 0.15) : 1;
+
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2); ctx.scale(scale, scale); ctx.translate(-(x + w/2), -(y + h/2));
+
+  // shadow glow
+  if (hover || pressed) {
+    ctx.shadowColor = col; ctx.shadowBlur = 14 * pulse;
+  }
+
+  // bg
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 8);
+  ctx.fillStyle = col.replace('#','rgba(').replace(/^rgba\((..)(..)(..)\)/,(_,r,g,b)=>{
+    return `rgba(${parseInt(r,16)},${parseInt(g,16)},${parseInt(b,16)},${bgAlpha})`;
+  }) || `rgba(245,200,66,${bgAlpha})`;
+
+  // Manual hex to rgb
+  const hx = col.slice(1);
+  const rr = parseInt(hx.slice(0,2),16), gg = parseInt(hx.slice(2,4),16), bb = parseInt(hx.slice(4,6),16);
+  ctx.fillStyle = `rgba(${rr},${gg},${bb},${bgAlpha})`;
+  ctx.fill();
+
+  // border
+  ctx.strokeStyle = `rgba(${rr},${gg},${bb},${borderA})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // label
+  const la = done ? 0.22 : hover ? 0.9 * pulse : pressed ? 1 : idle ? 0.25 : 0.9;
+  ctx.font = `800 ${done ? 10 : 11}px Inter`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = `rgba(${rr},${gg},${bb},${la})`;
+  if (!done) { ctx.shadowColor = `rgba(${rr},${gg},${bb},0.6)`; ctx.shadowBlur = 8; }
+  ctx.fillText(label, x + w/2, y + h/2);
+  ctx.shadowBlur = 0;
+
+  // press ripple
+  if (pressed && pressAnim > 0) {
+    ctx.beginPath(); ctx.arc(x+w/2, y+h/2, pressAnim * (w*0.7), 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(${rr},${gg},${bb},${(1-pressAnim)*0.5})`;
+    ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  // done strikethrough
+  if (done) {
+    ctx.strokeStyle = `rgba(${rr},${gg},${bb},0.15)`;
+    ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(x+8, y+h/2); ctx.lineTo(x+w-8, y+h/2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.restore();
+}
+
+function drawOrderbook(t) {
+  const { askRows, bidRows, fakeRow } = getOrderbookRows(t);
+  const x = OB_X, w = OB_W;
+  let y = OB_TOP;
+
+  // Panel bg
+  ctx.fillStyle = 'rgba(6,9,18,0.88)';
+  ctx.beginPath(); ctx.roundRect(x, y - 8, w, 320, 10); ctx.fill();
+  ctx.strokeStyle = 'rgba(50,220,130,0.07)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(x, y - 8, w, 320, 10); ctx.stroke();
+
+  // Header
+  ctx.font = '700 9px Inter'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(238,240,248,0.18)'; ctx.fillText('ORDERBOOK', x+10, y-4);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(238,240,248,0.1)'; ctx.fillText('ОБЪЁМ BTC', x+w-10, y-4);
+
+  // Ask rows
+  for (const row of askRows) {
+    const barW = (row.size / 100) * (w - 20);
+    ctx.fillStyle = 'rgba(255,92,92,0.06)';
+    ctx.fillRect(x+w-10-barW, y, barW, OB_ROW_H - 2);
+    ctx.font = '600 12px JetBrains Mono'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,92,92,0.55)'; ctx.fillText(row.price.toLocaleString(), x+10, y + OB_ROW_H/2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(238,240,248,0.22)'; ctx.fillText(row.size.toFixed(1), x+w-10, y + OB_ROW_H/2);
+    y += OB_ROW_H;
+  }
+
+  // Spread line
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.setLineDash([4,6]);
+  ctx.beginPath(); ctx.moveTo(x+8, y); ctx.lineTo(x+w-8, y); ctx.stroke(); ctx.setLineDash([]);
+  y += 4;
+
+  // Fake bid row (highlighted)
+  if (fakeRow) {
+    const barW = Math.max(0, (fakeRow.size / 10000) * (w - 20));
+    const pulse = 0.55 + 0.45 * Math.sin(frameN * 0.18);
+    ctx.fillStyle = `rgba(245,200,66,${0.12 * pulse})`;
+    ctx.fillRect(x, y, w, OB_ROW_H + 4);
+    ctx.fillStyle = `rgba(245,200,66,${0.22 * fakeRow.grow})`;
+    ctx.fillRect(x+10, y+4, barW, OB_ROW_H - 6);
+    // Border
+    ctx.strokeStyle = `rgba(245,200,66,${0.4 * pulse})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(x+2, y+1, w-4, OB_ROW_H+2, 4); ctx.stroke();
+    // Price text
+    ctx.font = '800 12px JetBrains Mono'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = `rgba(245,200,66,${0.9 * pulse})`; ctx.shadowColor = '#f5c842'; ctx.shadowBlur = 8 * pulse;
+    ctx.fillText(fakeRow.price.toLocaleString(), x+10, y + (OB_ROW_H+4)/2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = `rgba(245,200,66,${0.9 * fakeRow.grow})`;
+    ctx.fillText(fakeRow.size > 0 ? fakeRow.size.toLocaleString() : '...', x+w-10, y + (OB_ROW_H+4)/2);
+    ctx.shadowBlur = 0;
+    // "FAKE" badge
+    if (fakeRow.grow > 0.3) {
+      ctx.font = '800 8px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = `rgba(245,200,66,${fakeRow.grow * pulse})`;
+      ctx.shadowColor = '#f5c842'; ctx.shadowBlur = 6;
+      ctx.fillText('⚠ ФЕЙК', x + w/2, y + (OB_ROW_H+4)/2 - 8);
+      ctx.shadowBlur = 0;
+    }
+    y += OB_ROW_H + 10;
+  } else {
+    y += 4;
+  }
+
+  // Bid rows
+  for (const row of bidRows) {
+    const barW = (row.size / 100) * (w - 20);
+    ctx.fillStyle = 'rgba(50,220,130,0.06)';
+    ctx.fillRect(x+10, y, barW, OB_ROW_H - 2);
+    ctx.font = '600 12px JetBrains Mono'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(50,220,130,0.55)'; ctx.fillText(row.price.toLocaleString(), x+10, y + OB_ROW_H/2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(238,240,248,0.22)'; ctx.fillText(row.size.toFixed(1), x+w-10, y + OB_ROW_H/2);
+    y += OB_ROW_H;
+  }
+}
+
+function drawWhaleChart(t) {
+  const cx = OB_X, cy = CHART_TOP_L, cw = OB_W, ch = CHART_H_L;
+  const P_MIN = 65100, P_MAX = 65420;
+  const pY = v => cy + ch - Math.max(0, Math.min(1, (v-P_MIN)/(P_MAX-P_MIN))) * ch;
+
+  ctx.fillStyle = 'rgba(6,9,18,0.88)'; ctx.beginPath(); ctx.roundRect(cx, cy, cw, ch, 10); ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.roundRect(cx, cy, cw, ch, 10); ctx.clip();
+
+  // Grid
+  for (let v=P_MIN;v<=P_MAX;v+=50) {
+    ctx.beginPath(); ctx.moveTo(cx, pY(v)); ctx.lineTo(cx+cw, pY(v));
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 0.8; ctx.stroke();
+  }
+
+  // Fill
+  ctx.beginPath();
+  const n2 = Math.min(cw, priceHist.length);
+  for (let i=0;i<n2;i++) { const py2 = pY(priceHist[priceHist.length-n2+i]); i===0?ctx.moveTo(cx+i,py2):ctx.lineTo(cx+i,py2); }
+  ctx.lineTo(cx+n2-1,cy+ch); ctx.lineTo(cx,cy+ch); ctx.closePath();
+  const fill = ctx.createLinearGradient(0,cy,0,cy+ch);
+  const inRock = t >= PH_SELL && t < PH_CRASH_E;
+  fill.addColorStop(0, inRock?'rgba(50,220,130,0.18)':'rgba(50,220,130,0.07)');
+  fill.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=fill; ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  for (let i=0;i<n2;i++) { const py2=pY(priceHist[priceHist.length-n2+i]); i===0?ctx.moveTo(cx+i,py2):ctx.lineTo(cx+i,py2); }
+  ctx.strokeStyle = inRock?'#32dc82':'rgba(50,220,130,0.55)'; ctx.lineWidth = 1.8;
+  ctx.shadowColor = '#32dc82'; ctx.shadowBlur = inRock?14:4; ctx.stroke(); ctx.shadowBlur=0;
+
+  // Sell mark
+  if (t >= PH_SELL) {
+    const sellX = cx + Math.floor(n2 * ((PH_SELL - (t - n2/CYCLE*1)) / (t > PH_SELL ? 1 : 1)));
+    // Simple: draw at ~70% of chart
+    const markX = cx + Math.floor(n2 * 0.68);
+    const markY = pY(P_PEAK);
+    ctx.beginPath(); ctx.moveTo(markX, markY-12); ctx.lineTo(markX, markY+12);
+    ctx.strokeStyle = 'rgba(255,144,48,0.7)'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = '700 8px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#ff9030'; ctx.shadowColor = '#ff9030'; ctx.shadowBlur = 6;
+    ctx.fillText('SELL', markX, markY-14); ctx.shadowBlur=0;
+  }
+
+  ctx.restore();
+  ctx.strokeStyle='rgba(50,220,130,0.1)'; ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(cx, cy, cw, ch, 10); ctx.stroke();
+  ctx.font='700 9px Inter'; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillStyle='rgba(50,220,130,0.25)'; ctx.fillText('ГРАФИК  КИТ', cx+8, cy+6);
+
+  // Live price dot
+  const lv = priceHist[priceHist.length-1], lvY = pY(lv);
+  ctx.beginPath(); ctx.arc(cx+cw-2, lvY, 4, 0, Math.PI*2);
+  ctx.fillStyle='#32dc82'; ctx.shadowColor='#32dc82'; ctx.shadowBlur=8; ctx.fill(); ctx.shadowBlur=0;
+}
+
+// ── RIGHT SIDE: Trader view ──
+function drawTraderSide(t) {
+  const x = TR_OB_X, w = TR_OB_W;
+  const inFOMO  = t >= PH_FAKEBID + 0.08 && t < PH_CANCEL;
+  const inSell  = t >= PH_SELL;
+  const crashed = t >= PH_CRASH_E;
+  const price2  = getPrice(frameN);
+  const unrealPnl = traderBTC * (price2 - traderEntry);
+  const pulse = 0.65 + 0.35 * Math.sin(frameN * 0.13);
+
+  // ── Price ticker ──
+  const tickY = TOP + 82;
+  ctx.fillStyle = crashed ? 'rgba(255,92,92,0.09)' : inFOMO ? 'rgba(50,220,130,0.07)' : 'rgba(6,9,18,0.88)';
+  ctx.beginPath(); ctx.roundRect(x, tickY, w, 52, 10); ctx.fill();
+  const tcol = crashed ? '#ff5c5c' : inFOMO ? '#32dc82' : '#eef0f8';
+  ctx.font='900 22px Inter'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=tcol; ctx.shadowColor=tcol; ctx.shadowBlur=crashed?14:inFOMO?10:3;
+  ctx.fillText(price2.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), x+w/2, tickY+26);
+  ctx.shadowBlur=0;
+  const arrow = crashed ? '▼' : inFOMO ? '▲' : '';
+  if (arrow) {
+    ctx.font='800 11px Inter'; ctx.fillStyle=tcol; ctx.shadowColor=tcol; ctx.shadowBlur=6;
+    ctx.fillText(arrow + (crashed?' КРАХ':' РАСТЁТ'), x+w/2, tickY+42);
+    ctx.shadowBlur=0;
+  }
+
+  // ── Trader "screen" — showing what trader sees ──
+  const screenY = TOP + 148;
+
+  if (!inFOMO && !inSell) {
+    // Pre-buy state: orderbook tease
+    ctx.fillStyle = 'rgba(6,9,18,0.78)'; ctx.beginPath(); ctx.roundRect(x, screenY, w, 200, 10); ctx.fill();
+    ctx.font='700 9px Inter'; ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle='rgba(238,240,248,0.18)'; ctx.fillText('КНИГА ЗАЯВОК', x+8, screenY+8);
+    // Show simplified orderbook from trader's perspective (they see the fake wall!)
+    const rows = [
+      { p: 65420, s: 18.4, t: 'ask' }, { p: 65390, s: 42.1, t: 'ask' },
+      { p: 65200, s: Math.round(8540 * Math.min(1, (t - Math.max(PH_SETUP_E,0)) / (PH_WALL_E - PH_SETUP_E))), t: 'fake' },
+      { p: 65230, s: 12.8, t: 'bid' }, { p: 65210, s: 55.2, t: 'bid' },
+    ];
+    let ry = screenY + 26;
+    for (const row of rows) {
+      const isF = row.t === 'fake';
+      const col = row.t === 'ask' ? 'rgba(255,92,92,0.5)' : isF ? `rgba(245,200,66,${0.7*pulse})` : 'rgba(50,220,130,0.5)';
+      ctx.font = isF ? '800 11px JetBrains Mono' : '600 11px JetBrains Mono';
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillStyle=col;
+      if (isF) { ctx.shadowColor='#f5c842'; ctx.shadowBlur=6; }
+      ctx.fillText(row.p.toLocaleString(), x+8, ry+14);
+      ctx.textAlign='right';
+      ctx.fillText(row.s > 0 ? row.s.toLocaleString() : '...', x+w-8, ry+14);
+      ctx.shadowBlur=0;
+      if (isF) {
+        ctx.font='700 8px Inter'; ctx.textAlign='center';
+        ctx.fillStyle=`rgba(245,200,66,${pulse*0.6})`; ctx.shadowColor='#f5c842'; ctx.shadowBlur=4;
+        ctx.fillText('← БОЛЬШОЙ СПРОС', x+w/2, ry+14);
+        ctx.shadowBlur=0;
+      }
+      ry += 32;
+    }
+
+    // FOMO label
+    if (t >= PH_SETUP_E + 0.04) {
+      const fa = Math.min(1, (t - PH_SETUP_E - 0.04) / 0.06) * pulse;
+      ctx.font='800 10px Inter'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle=`rgba(245,200,66,${fa})`; ctx.shadowColor='#f5c842'; ctx.shadowBlur=8;
+      ctx.fillText('Вижу стену — надо покупать!', x+w/2, screenY+195);
+      ctx.shadowBlur=0;
+    }
+  }
+
+  // ── Position box (when in trade) ──
+  if (inFOMO || inSell) {
+    const posY = screenY;
+    const posBG = crashed ? 'rgba(255,92,92,0.08)' : unrealPnl > 0 ? 'rgba(50,220,130,0.07)' : 'rgba(255,92,92,0.05)';
+    ctx.fillStyle = posBG; ctx.beginPath(); ctx.roundRect(x, posY, w, 120, 10); ctx.fill();
+    const bcol = crashed ? 'rgba(255,92,92,0.25)' : unrealPnl > 0 ? 'rgba(50,220,130,0.18)' : 'rgba(255,92,92,0.15)';
+    ctx.strokeStyle = bcol; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(x, posY, w, 120, 10); ctx.stroke();
+
+    ctx.font='700 9px Inter'; ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle='rgba(238,240,248,0.22)'; ctx.fillText('МОЯ ПОЗИЦИЯ', x+10, posY+10);
+
+    ctx.font='800 18px Inter'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    const pcol = unrealPnl >= 0 ? '#32dc82' : '#ff5c5c';
+    ctx.fillStyle=pcol; ctx.shadowColor=pcol; ctx.shadowBlur=10;
+    ctx.fillText((unrealPnl>=0?'+':'')+unrealPnl.toFixed(2)+' USD', x+10, posY+46);
+    ctx.shadowBlur=0;
+
+    ctx.font='600 11px Inter'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(238,240,248,0.3)';
+    ctx.fillText(traderBTC.toFixed(3)+' BTC  @  '+traderEntry.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), x+10, posY+72);
+
+    const statusTxt = crashed ? '⚠ УБЫТОК — СТЕНА ИСЧЕЗЛА' : unrealPnl > 0 ? '▲ В ПЛЮСЕ' : '▼ В МИНУСЕ';
+    const sTxtCol   = crashed ? '#ff5c5c' : unrealPnl > 0 ? '#32dc82' : '#ff5c5c';
+    ctx.font='700 9px Inter'; ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle=sTxtCol; ctx.shadowColor=sTxtCol; ctx.shadowBlur=crashed?8:4;
+    ctx.fillText(statusTxt, x+10, posY+95);
+    ctx.shadowBlur=0;
+
+    // Buy flash highlight
+    if (traderBuyFlash > 0) {
+      ctx.fillStyle = `rgba(50,220,130,${traderBuyFlash*0.14})`; ctx.beginPath(); ctx.roundRect(x, posY, w, 120, 10); ctx.fill();
+    }
+  }
+
+  // ── Trader chart ──
+  const tChartY = inFOMO||inSell ? screenY+132 : screenY+212;
+  const tChartH = inFOMO||inSell ? 200 : 160;
+  const P_MIN=65100, P_MAX=65420;
+  const pY2 = v => tChartY + tChartH - Math.max(0,Math.min(1,(v-P_MIN)/(P_MAX-P_MIN)))*tChartH;
+
+  ctx.fillStyle='rgba(6,9,18,0.88)'; ctx.beginPath(); ctx.roundRect(x, tChartY, w, tChartH, 10); ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.roundRect(x, tChartY, w, tChartH, 10); ctx.clip();
+
+  for(let v=P_MIN;v<=P_MAX;v+=50){ ctx.beginPath();ctx.moveTo(x,pY2(v));ctx.lineTo(x+w,pY2(v));ctx.strokeStyle='rgba(255,255,255,0.025)';ctx.lineWidth=0.8;ctx.stroke(); }
+
+  const n3=Math.min(w, priceHist.length);
+  ctx.beginPath();
+  for(let i=0;i<n3;i++){const pv=priceHist[priceHist.length-n3+i];i===0?ctx.moveTo(x+i,pY2(pv)):ctx.lineTo(x+i,pY2(pv));}
+  ctx.lineTo(x+n3-1,tChartY+tChartH);ctx.lineTo(x,tChartY+tChartH);ctx.closePath();
+  const fill2=ctx.createLinearGradient(0,tChartY,0,tChartY+tChartH);
+  if(crashed){fill2.addColorStop(0,'rgba(255,92,92,0.14)');fill2.addColorStop(1,'rgba(255,92,92,0.01)');}
+  else if(inFOMO){fill2.addColorStop(0,'rgba(50,220,130,0.08)');fill2.addColorStop(1,'rgba(0,0,0,0)');}
+  else{fill2.addColorStop(0,'rgba(238,240,248,0.04)');fill2.addColorStop(1,'rgba(0,0,0,0)');}
+  ctx.fillStyle=fill2;ctx.fill();
+  ctx.beginPath();
+  for(let i=0;i<n3;i++){const pv=priceHist[priceHist.length-n3+i];i===0?ctx.moveTo(x+i,pY2(pv)):ctx.lineTo(x+i,pY2(pv));}
+  const lc2=crashed?'#ff5c5c':inFOMO?'rgba(50,220,130,0.7)':'rgba(238,240,248,0.4)';
+  ctx.strokeStyle=lc2;ctx.lineWidth=1.8;ctx.shadowColor=lc2;ctx.shadowBlur=crashed?12:4;ctx.stroke();ctx.shadowBlur=0;
+
+  // Entry line
+  if (traderBTC > 0 && traderEntry > 0) {
+    const ey = pY2(traderEntry);
+    ctx.beginPath();ctx.moveTo(x,ey);ctx.lineTo(x+w,ey);
+    ctx.strokeStyle='rgba(245,200,66,0.35)';ctx.lineWidth=1;ctx.setLineDash([5,5]);ctx.stroke();ctx.setLineDash([]);
+    ctx.font='700 8px Inter';ctx.textAlign='right';ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(245,200,66,0.5)';ctx.fillText('ВХОД',x+w-4,ey-8);
+  }
+
+  ctx.restore();
+  const tc=crashed?'rgba(255,92,92,0.2)':inFOMO?'rgba(50,220,130,0.1)':'rgba(255,255,255,0.05)';
+  ctx.strokeStyle=tc;ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(x,tChartY,w,tChartH,10);ctx.stroke();
+  ctx.font='700 9px Inter';ctx.textAlign='left';ctx.textBaseline='top';
+  ctx.fillStyle=crashed?'rgba(255,92,92,0.3)':inFOMO?'rgba(50,220,130,0.2)':'rgba(238,240,248,0.15)';
+  ctx.fillText('ГРАФИК  ТРЕЙДЕР', x+8, tChartY+6);
+
+  // Panic label
+  if (crashed) {
+    const pa = Math.min(1, (t - PH_CRASH_E) / 0.08) * pulse;
+    ctx.font='800 13px Inter';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=`rgba(255,92,92,${pa})`;ctx.shadowColor='#ff5c5c';ctx.shadowBlur=14;
+    ctx.fillText('СТЕНА ИСЧЕЗЛА — ГДЕ СПРОС??', x+w/2, tChartY+tChartH+24);
+    ctx.shadowBlur=0;
+  }
+}
+
+// ══════════════════════════
+//  DRAW MAIN
+// ══════════════════════════
+function draw() {
+  const sx = shakeAmt > 0 ? rnd(-shakeAmt,shakeAmt) : 0;
+  const sy = shakeAmt > 0 ? rnd(-shakeAmt,shakeAmt) : 0;
+  ctx.save(); ctx.translate(sx, sy);
+
+  ctx.fillStyle='#08090f'; ctx.fillRect(-30,-30,W+60,H+60);
+
+  // BG dots
+  for(const d of bgDots){ ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,Math.PI*2);ctx.fillStyle=d.col;ctx.globalAlpha=d.a;ctx.fill();ctx.globalAlpha=1; }
+
+  // Side bg tints
+  const cf2 = frameN % CYCLE, t2 = cf2 / CYCLE;
+  const wallOn = t2 >= PH_FAKEBID && t2 < PH_CANCEL;
+  const inProfit = t2 >= PH_SELL && t2 < PH_CRASH_E;
+  const crashed2 = t2 >= PH_CRASH_E;
+
+  // Left (whale) tint — green glow when profiting
+  if (inProfit) {
+    const g = ctx.createLinearGradient(0,TOP,MX,TOP);
+    g.addColorStop(0,'rgba(50,220,130,0.05)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,TOP,MX,CH);
+  }
+  // Right (trader) tint — red glow when crashing
+  if (crashed2) {
+    const g2 = ctx.createLinearGradient(MX,TOP,W,TOP);
+    g2.addColorStop(0,'rgba(0,0,0,0)'); g2.addColorStop(1,'rgba(255,92,92,0.06)');
+    ctx.fillStyle=g2; ctx.fillRect(MX,TOP,MX,CH);
+  }
+
+  // Phase label
+  const phaseLabel =
+    t2 < PH_SETUP_E  ? 'НАБЛЮДАЕТ' :
+    t2 < PH_FAKEBID  ? 'ГОТОВИТСЯ' :
+    t2 < PH_WALL_E   ? 'СТЕНА РАСТЁТ' :
+    t2 < PH_CANCEL   ? 'ЛОВУШКА ЗАХЛОПНУЛАСЬ' :
+    t2 < PH_SELL     ? 'СТЕНА СНЯТА' :
+    t2 < PH_CRASH_E  ? 'КИТ ПРОДАЁТ' : 'ИТОГ';
+  const phaseCol =
+    t2 < PH_SETUP_E  ? 'rgba(238,240,248,0.1)' :
+    t2 < PH_WALL_E   ? 'rgba(245,200,66,0.35)' :
+    t2 < PH_SELL     ? 'rgba(255,92,92,0.45)' :
+    t2 < PH_CRASH_E  ? 'rgba(50,220,130,0.5)' : 'rgba(255,92,92,0.55)';
+  ctx.font='700 10px Inter'; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillStyle=phaseCol; ctx.shadowColor=phaseCol; ctx.shadowBlur=8;
+  ctx.fillText(phaseLabel, MX, TOP+6); ctx.shadowBlur=0;
+
+  // Whale buttons
+  drawBtn(btnFakeBid);
+  drawBtn(btnCancel);
+  drawBtn(btnSell);
+
+  // Orderbook
+  drawOrderbook(t2);
+
+  // Whale chart
+  drawWhaleChart(t2);
+
+  // Trader side
+  drawTraderSide(t2);
+
+  // Whale balance box
+  const wbY = TOP + 640;
+  const wbW = OB_W;
+  const wd = whaleBal - WHALE_START;
+  ctx.fillStyle = wd > 100 ? 'rgba(50,220,130,0.07)' : 'rgba(6,9,18,0.8)';
+  ctx.beginPath(); ctx.roundRect(OB_X, wbY, wbW, 78, 10); ctx.fill();
+  ctx.strokeStyle = wd > 100 ? 'rgba(50,220,130,0.18)' : 'rgba(255,255,255,0.05)';
+  ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(OB_X, wbY, wbW, 78, 10); ctx.stroke();
+  ctx.font='700 9px Inter'; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillStyle='rgba(238,240,248,0.2)'; ctx.fillText('ПРОФИТ КИТА', OB_X+10, wbY+9);
+  ctx.font='900 24px Inter'; ctx.textAlign='left'; ctx.textBaseline='middle';
+  const wc = wd > 100 ? '#32dc82' : 'rgba(238,240,248,0.3)';
+  ctx.fillStyle=wc; ctx.shadowColor=wc; ctx.shadowBlur = wd>100 ? 14 : 0;
+  ctx.fillText((wd >= 0 ? '+' : '') + '$' + Math.round(wd).toLocaleString(), OB_X+10, wbY+46);
+  ctx.shadowBlur=0;
+  if (wd > 100) {
+    ctx.font='600 10px Inter'; ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle='rgba(50,220,130,0.35)'; ctx.fillText('за одну операцию спуфинга', OB_X+10, wbY+62);
+  }
+
+  // Divider center line (on top of everything except effects)
+  ctx.strokeStyle='rgba(255,255,255,0.055)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(MX, TOP); ctx.lineTo(MX, BOT); ctx.stroke();
+
+  // Rings
+  for(const rg of rings){ ctx.beginPath();ctx.arc(rg.x,rg.y,rg.r,0,Math.PI*2);ctx.strokeStyle=rg.col;ctx.lineWidth=rg.life*(rg.thick?4:2);ctx.globalAlpha=rg.life*0.65;ctx.shadowColor=rg.col;ctx.shadowBlur=10;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1; }
+  for(const l of lightnings) drawLightning(l.x1,l.y1,l.x2,l.y2,l.col,l.life*0.85,1.6);
+  for(const p of parts){ ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.3,p.r*p.life),0,Math.PI*2);ctx.fillStyle=p.col;ctx.globalAlpha=p.life;ctx.shadowColor=p.col;ctx.shadowBlur=5;ctx.fill();ctx.shadowBlur=0;ctx.globalAlpha=1; }
+  for(const s of sparks){ const ex=s.x-s.vx*s.len*(0.4+s.life*0.6),ey=s.y-s.vy*s.len*(0.4+s.life*0.6);ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(ex,ey);ctx.strokeStyle=s.col;ctx.lineWidth=s.life*2;ctx.globalAlpha=s.life*0.8;ctx.shadowColor=s.col;ctx.shadowBlur=5;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1; }
+  for(const f of flashes){ const pp=1-f.life;ctx.beginPath();ctx.arc(f.x,f.y,4+pp*80,0,Math.PI*2);ctx.fillStyle=`rgba(50,220,130,${f.life*0.35})`;ctx.fill();ctx.beginPath();ctx.arc(f.x,f.y,2+pp*24,0,Math.PI*2);ctx.fillStyle=`rgba(200,255,230,${f.life*0.8})`;ctx.fill(); }
+  for(const fn of floatNums){ ctx.font=fn.big?`900 ${Math.round(16+fn.life*6)}px Inter`:'800 12px Inter';ctx.fillStyle=fn.col;ctx.textAlign='center';ctx.textBaseline='middle';ctx.globalAlpha=fn.life;ctx.shadowColor=fn.col;ctx.shadowBlur=fn.big?18:8;ctx.fillText(fn.text,fn.x,fn.y);ctx.shadowBlur=0;ctx.globalAlpha=1; }
+
+  ctx.restore();
+
+  if(screenFlash>0){
+    if(screenFlash>0.7){ctx.fillStyle=`rgba(255,255,255,${(screenFlash-0.7)*0.35})`;ctx.fillRect(0,0,W,H);}
+    ctx.fillStyle=`rgba(50,220,130,${Math.min(1,screenFlash)*0.12})`;ctx.fillRect(0,0,W,H);
+  }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+</script>
+</body>
+</html>

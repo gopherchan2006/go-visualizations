@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spoofing Scene 2 — Толпа и хищник</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #050608; display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; font-family: 'Inter', sans-serif;
+}
+.frame {
+  width: 540px; height: 960px; position: relative; overflow: hidden;
+  background: #08090f; border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px; box-shadow: 0 0 80px rgba(0,0,0,0.9);
+}
+canvas { position: absolute; top: 0; left: 0; width: 540px; height: 960px; z-index: 1; }
+.hdr {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  padding: 22px 28px 18px; display: flex; justify-content: space-between; align-items: flex-start;
+  background: linear-gradient(180deg, rgba(8,9,15,0.97) 60%, transparent 100%);
+}
+.hdr-pair { font-size: 24px; font-weight: 800; color: #eef0f8; letter-spacing: 0.3px; }
+.hdr-pair em { color: rgba(238,240,248,0.28); font-style: normal; font-weight: 500; }
+.hdr-sub { font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.8px; text-transform: uppercase; margin-top: 5px; }
+.hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.spoof-tag {
+  padding: 4px 11px; border-radius: 7px;
+  background: rgba(255,92,92,0.10); border: 1px solid rgba(255,92,92,0.32);
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #ff5c5c;
+  text-shadow: 0 0 8px rgba(255,92,92,0.7);
+  animation: spfPulse 1.2s ease-in-out infinite;
+}
+@keyframes spfPulse { 0%,100%{opacity:0.45} 50%{opacity:1} }
+.live-badge { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: #1e2840; letter-spacing: 1.5px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #ff5c5c; box-shadow: 0 0 8px rgba(255,92,92,0.9); animation: ldBlink 2s ease-in-out infinite; }
+@keyframes ldBlink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.readout {
+  position: absolute; top: 108px; left: 0; right: 0; z-index: 3;
+  height: 60px; display: flex; align-items: stretch;
+  background: rgba(8,9,15,0.94);
+  border-top: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,92,92,0.07);
+}
+.rd-blk { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 16px; gap: 2px; }
+.rd-blk.ctr { align-items: center; border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); }
+.rd-blk.right { align-items: flex-end; }
+.rd-lbl { font-size: 9px; font-weight: 700; color: #1a2235; letter-spacing: 1.8px; text-transform: uppercase; }
+.rd-val { font-size: 24px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+.rd-val.r { color: #ff5c5c; text-shadow: 0 0 12px rgba(255,92,92,0.4); }
+.rd-val.g { color: #32dc82; text-shadow: 0 0 12px rgba(50,220,130,0.4); }
+.rd-val.w { color: #eef0f8; }
+.rd-val.dim { color: rgba(238,240,248,0.22); }
+.rd-sub { font-size: 10px; font-weight: 500; color: #1a2235; }
+.stats {
+  position: absolute; bottom: 98px; left: 0; right: 0; z-index: 3;
+  display: flex; padding: 0 16px; gap: 8px;
+}
+.s-box {
+  flex: 1; background: rgba(8,9,15,0.88); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.055); border-radius: 14px;
+  padding: 14px 12px 12px; display: flex; flex-direction: column; gap: 3px;
+}
+.s-box.accent { border-color: rgba(255,92,92,0.22); }
+.s-lbl { font-size: 9px; font-weight: 700; color: #1a2235; letter-spacing: 1.8px; text-transform: uppercase; }
+.s-val { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+.s-val.r { color: #ff5c5c; }
+.s-val.g { color: #32dc82; text-shadow: 0 0 10px rgba(50,220,130,0.3); }
+.s-val.y { color: #f5c842; }
+.s-val.w { color: #eef0f8; }
+.s-sub { font-size: 10px; font-weight: 500; color: #1a2235; }
+.footer {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  height: 90px; padding: 16px 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(0deg, rgba(8,9,15,0.98) 65%, transparent 100%);
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.f-lbl { font-size: 10px; font-weight: 700; color: #1a2235; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+.f-price { font-size: 28px; font-weight: 800; color: #eef0f8; letter-spacing: -0.5px; }
+.f-tag {
+  padding: 4px 12px; border-radius: 7px;
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px;
+}
+.f-delta { font-size: 11px; font-weight: 500; color: #1a2235; margin-top: 5px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <div class="hdr">
+    <div>
+      <div class="hdr-pair">BTC<em>/USDT</em></div>
+      <div class="hdr-sub">Паника толпы — скупка хищника</div>
+    </div>
+    <div class="hdr-right">
+      <div class="spoof-tag">⚠ SPOOF</div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>
+  </div>
+
+  <div class="readout">
+    <div class="rd-blk">
+      <span class="rd-lbl">Продажи</span>
+      <span class="rd-val r" id="rdSells">0</span>
+      <span class="rd-sub">паника рынка</span>
+    </div>
+    <div class="rd-blk ctr">
+      <span class="rd-lbl">Цена</span>
+      <span class="rd-val w" id="rdPrice">65,230.00</span>
+      <span class="rd-sub" id="rdPriceSub">уровень</span>
+    </div>
+    <div class="rd-blk right">
+      <span class="rd-lbl">Кит скупил</span>
+      <span class="rd-val g" id="rdWhale">+0 BTC</span>
+      <span class="rd-sub">позиция</span>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="s-box accent">
+      <div class="s-lbl">Спуфов</div>
+      <div class="s-val r" id="sSpoofs">0</div>
+      <div class="s-sub">поймано</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">Скуплено</div>
+      <div class="s-val g" id="sBTC">+0 BTC</div>
+      <div class="s-sub">позиция кита</div>
+    </div>
+    <div class="s-box">
+      <div class="s-lbl">Движение</div>
+      <div class="s-val y" id="sMove">+$0</div>
+      <div class="s-sub">после исчезн.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <div class="f-lbl">Last Price</div>
+      <div class="f-price" id="fPrice">65,230.00</div>
+    </div>
+    <div style="text-align:right">
+      <div class="f-tag" id="fTag" style="color:#32dc82;border:1px solid rgba(50,220,130,0.22);background:rgba(50,220,130,0.08)">MONITORING</div>
+      <div class="f-delta" id="fDelta">Δ 0.00 USD (0.000%)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 540, H = 960, CX = 270;
+
+// ── Layout ──
+const WALL_TOP  = 194;
+const WALL_BOT  = 342;
+const WALL_CY   = (WALL_TOP + WALL_BOT) * 0.5;  // 268
+
+const PRICE_BASE_Y = 448;
+const PRICE_DRIFT  = 64;
+const PRICE_RISE   = 128;
+
+const PRED_CX = CX;
+const PRED_CY = 650;
+
+const CHART_X = 26, CHART_W = 488, CHART_TOP = 748, CHART_H = 76;
+const N_PTS   = CHART_W;
+
+// ── Cycle phases ──
+const CYCLE     = 610;
+const PH_WALL_S = 0.10;
+const PH_WALL_P = 0.27;
+const PH_WALL_E = 0.68;
+const PH_ROCK   = 0.84;
+
+// ── Price functions ──
+const P_BASE = 65230;
+function getPY(f) {
+  const t = (f % CYCLE) / CYCLE;
+  const n = Math.sin(f * 0.08) * 2.5;
+  if (t < PH_WALL_S) return PRICE_BASE_Y + n;
+  if (t < PH_WALL_E) {
+    const p = Math.min(1, (t - PH_WALL_S) / (PH_WALL_E - PH_WALL_S));
+    const sm = p*p*(3-2*p);
+    return PRICE_BASE_Y + sm * PRICE_DRIFT + n;
+  }
+  if (t < PH_ROCK) {
+    const p = (t - PH_WALL_E) / (PH_ROCK - PH_WALL_E);
+    const e = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
+    return (PRICE_BASE_Y + PRICE_DRIFT) - e * (PRICE_DRIFT + PRICE_RISE) + n;
+  }
+  return (PRICE_BASE_Y - PRICE_RISE) + ((t - PH_ROCK) / (1 - PH_ROCK)) * 32 + n;
+}
+function getPVal(f) {
+  const t = (f % CYCLE) / CYCLE;
+  const n = Math.sin(f * 0.11) * 0.9;
+  if (t < PH_WALL_S) return P_BASE + n;
+  if (t < PH_WALL_E) {
+    const p = Math.min(1, (t - PH_WALL_S) / (PH_WALL_E - PH_WALL_S));
+    return P_BASE - p*p*(3-2*p) * 52 + n;
+  }
+  if (t < PH_ROCK) {
+    const p = (t - PH_WALL_E) / (PH_ROCK - PH_WALL_E);
+    const e = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
+    return (P_BASE - 52) + e * 138 + n;
+  }
+  return (P_BASE + 86) - ((t - PH_ROCK) / (1 - PH_ROCK)) * 26 + n;
+}
+
+function rnd(a, b) { return a + Math.random() * (b - a); }
+
+// ── State ──
+let frameN = 0, lastExpCy = -1;
+let predSize = 0, predPulse = 0;
+let absorptions = 0, totalBTC = 0, spoofCount = 0;
+let screenFlash = 0, shakeAmt = 0;
+let prcHist = new Array(N_PTS).fill(P_BASE);
+
+// ── Traders ──
+let traders = [];
+let totalSells = 0;
+
+// ── Effects ──
+let parts = [], sparks = [], rings = [], lightnings = [], flashes = [], floatNums = [], absRings = [];
+
+// ── BG dust ──
+let bgDots = [];
+for (let i = 0; i < 44; i++) {
+  bgDots.push({
+    x: rnd(0, W), y: rnd(0, H),
+    vx: rnd(-0.05, 0.05), vy: rnd(-0.06, 0.06),
+    r: rnd(0.4, 1.6), a: rnd(0.02, 0.07),
+    col: Math.random() > 0.5 ? '#ff5c5c' : '#661122'
+  });
+}
+
+// ── Lightning ──
+function drawLightning(x1, y1, x2, y2, col, alpha, w) {
+  const pts = [{x:x1,y:y1}];
+  for (let i = 1; i < 6; i++) {
+    const t = i/6;
+    pts.push({x:x1+(x2-x1)*t+rnd(-14,14), y:y1+(y2-y1)*t+rnd(-10,10)});
+  }
+  pts.push({x:x2,y:y2});
+  ctx.save(); ctx.globalAlpha=Math.max(0,alpha);
+  ctx.strokeStyle=col; ctx.lineWidth=w; ctx.shadowColor=col; ctx.shadowBlur=12;
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+  ctx.stroke();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=w*0.3; ctx.shadowBlur=4;
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+  ctx.stroke(); ctx.restore();
+}
+
+// ── Organic blob shape ──
+function drawBlob(cx, cy, r, phase, col, alpha) {
+  const pts = 12;
+  ctx.beginPath();
+  for (let i = 0; i <= pts; i++) {
+    const ang = (i / pts) * Math.PI * 2;
+    const n = 1 + Math.sin(ang*2+phase)*0.18 + Math.sin(ang*3-phase*1.3)*0.11 + Math.sin(ang*5+phase*0.6)*0.06;
+    const px = cx + Math.cos(ang) * r * n;
+    const py = cy + Math.sin(ang) * r * n;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = col; ctx.globalAlpha = alpha; ctx.fill(); ctx.globalAlpha = 1;
+}
+
+// ── Spawn trader ──
+function spawnTrader() {
+  const btc = rnd(1, 12);
+  totalSells++;
+  traders.push({
+    x: rnd(36, W - 36),
+    y: rnd(WALL_TOP + 8, WALL_BOT - 8),
+    vx: rnd(-0.5, 0.5),
+    vy: rnd(0.8, 2.2),
+    r: 2 + btc * 0.28,
+    btc,
+    life: 1,
+    state: 'falling',  // 'falling' | 'pulled' | 'absorbed'
+    panic: Math.random() > 0.4,
+  });
+}
+
+// ── Explosion ──
+function triggerExplosion() {
+  spoofCount++;
+  screenFlash = 1.4; shakeAmt = 14;
+  const bx = PRED_CX, by = PRED_CY;
+
+  flashes.push({x: bx, y: by, life: 1});
+  flashes.push({x: CX, y: WALL_CY, life: 0.9});
+
+  // Green burst upward (buying pressure released)
+  for (let i = 0; i < 60; i++) {
+    const a = rnd(-Math.PI, 0) - Math.PI * 0.5 + rnd(-0.6, 0.6);
+    const s = rnd(3, 16);
+    parts.push({
+      x: bx + rnd(-30, 30), y: by,
+      vx: Math.cos(a)*s, vy: Math.sin(a)*s - rnd(1, 3),
+      r: rnd(2, 8), life: 1,
+      col: Math.random() > 0.38 ? '#32dc82' : (Math.random() > 0.5 ? '#f5c842' : '#00ffaa')
+    });
+  }
+  // Red debris from wall dissolving
+  for (let i = 0; i < 28; i++) {
+    const a = rnd(0, Math.PI * 2);
+    parts.push({
+      x: rnd(36, W-36), y: rnd(WALL_TOP, WALL_BOT),
+      vx: Math.cos(a)*rnd(1,7), vy: Math.sin(a)*rnd(1,7),
+      r: rnd(2,5), life: 1, col: '#ff5c5c'
+    });
+  }
+  for (let i = 0; i < 28; i++) {
+    const a = rnd(-Math.PI, 0);
+    sparks.push({ x: bx, y: by, vx: Math.cos(a)*rnd(5,22), vy: Math.sin(a)*rnd(3,18)-2, life: 1, len: rnd(8,30), col: i%2===0?'#32dc82':'#f5c842' });
+  }
+  rings.push({x: bx, y: by, r: 4, maxR: 320, life: 1, col: '#32dc82', thick: true});
+  rings.push({x: CX, y: WALL_CY, r: 4, maxR: 220, life: 1, col: '#ff5c5c', thick: false});
+  for (let i = 1; i <= 4; i++) {
+    setTimeout(() => rings.push({x: bx, y: by, r:4, maxR:70+i*75, life:1, col:i%2===0?'#f5c842':'#32dc82', thick:false}), i*90);
+  }
+  for (let i = 0; i < 6; i++) {
+    lightnings.push({x1: bx, y1: by, x2: bx+rnd(-80,80), y2: by-rnd(60,180), life:1.1, col:i<3?'#32dc82':'#f5c842', thick:i<1});
+  }
+  floatNums.push({x: CX, y: WALL_CY, text: 'ИСЧЕЗ!', life:1.3, vy:-1.8, col:'#ff5c5c', big:true});
+  setTimeout(() => floatNums.push({x: bx, y: by-20, text:'+$86.00 ↑', life:1.3, vy:-1.2, col:'#32dc82', big:false}), 350);
+
+  predSize = 0;
+  document.getElementById('sSpoofs').textContent = spoofCount;
+  document.getElementById('sMove').textContent   = '+$86';
+}
+
+// ── Update ──
+function update() {
+  frameN++;
+  const cf  = frameN % CYCLE;
+  const ci  = Math.floor(frameN / CYCLE);
+  const t   = cf / CYCLE;
+  const curPY  = getPY(frameN);
+  const curPV  = getPVal(frameN);
+
+  // Wall alpha
+  if (t < PH_WALL_S)      { /* nothing */ }
+  else if (t < PH_WALL_P) { /* ramp in */ }
+  else if (t < PH_WALL_E) { /* full */ }
+
+  // Trigger explosion
+  if (t >= PH_WALL_E && lastExpCy !== ci) {
+    lastExpCy = ci;
+    triggerExplosion();
+  }
+
+  // Spawn traders
+  const wallStrength = t < PH_WALL_S ? 0 : t < PH_WALL_P
+    ? (t - PH_WALL_S) / (PH_WALL_P - PH_WALL_S)
+    : t < PH_WALL_E ? 1.0 : 0;
+
+  if (wallStrength > 0.05 && frameN - (frameN - cf) > 0) {
+    const spawnRate = 18 - Math.floor(wallStrength * 10); // faster as wall grows
+    if (cf % Math.max(6, spawnRate) === 0) spawnTrader();
+    if (wallStrength > 0.6 && cf % Math.max(10, spawnRate + 5) === 3) spawnTrader(); // double spawn
+  }
+
+  // Update traders
+  const pullR = 55 + predSize * 85;
+  for (let i = traders.length - 1; i >= 0; i--) {
+    const tr = traders[i];
+    if (tr.state === 'absorbed') { traders.splice(i, 1); continue; }
+
+    // Panic wobble
+    if (tr.panic) tr.vx += rnd(-0.06, 0.06);
+
+    if (tr.state === 'falling') {
+      tr.x += tr.vx; tr.y += tr.vy;
+      tr.vx *= 0.98;
+      // Clamp x
+      if (tr.x < 20)    { tr.x = 20;    tr.vx *= -0.6; }
+      if (tr.x > W-20)  { tr.x = W-20;  tr.vx *= -0.6; }
+
+      // Check if below price line → enter predator zone
+      if (tr.y > curPY + 10) {
+        const dx = PRED_CX - tr.x, dy = PRED_CY - tr.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < pullR + 40) tr.state = 'pulled';
+      }
+      // Off screen
+      if (tr.y > H + 20) traders.splice(i, 1);
+
+    } else if (tr.state === 'pulled') {
+      const dx = PRED_CX - tr.x, dy = PRED_CY - tr.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      tr.vx += dx / dist * 0.65;
+      tr.vy += dy / dist * 0.65;
+      tr.vx *= 0.92; tr.vy *= 0.92;
+      tr.x += tr.vx; tr.y += tr.vy;
+
+      if (dist < 16) {
+        tr.state = 'absorbed';
+        absorptions++;
+        totalBTC += tr.btc;
+        predSize = Math.min(1, predSize + 0.012);
+        predPulse = 1;
+        absRings.push({x: PRED_CX, y: PRED_CY, r: 10, maxR: 30 + tr.r*4, life: 1});
+        floatNums.push({x: PRED_CX + rnd(-40,40), y: PRED_CY - pullR - 10, text: '-' + tr.btc.toFixed(1), life: 0.8, vy: -0.8, col: '#ff5c5c', big: false});
+      }
+    }
+  }
+
+  // Predator pulse decay
+  predPulse = Math.max(0, predPulse - 0.08);
+
+  prcHist.push(curPV); prcHist.shift();
+
+  // Decay
+  if (shakeAmt > 0) { shakeAmt *= 0.72; if (shakeAmt < 0.25) shakeAmt = 0; }
+  if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - 0.042);
+
+  for (let i=parts.length-1;i>=0;i--) { const p=parts[i]; p.x+=p.vx;p.y+=p.vy;p.vx*=0.91;p.vy*=0.91;p.life-=0.025; if(p.life<=0) parts.splice(i,1); }
+  for (let i=sparks.length-1;i>=0;i--) { const s=sparks[i]; s.x+=s.vx;s.y+=s.vy;s.vx*=0.88;s.vy*=0.88;s.life-=0.036; if(s.life<=0) sparks.splice(i,1); }
+  for (let i=rings.length-1;i>=0;i--) { const rg=rings[i]; rg.r+=(rg.maxR-rg.r)*0.088; rg.life-=0.024; if(rg.life<=0) rings.splice(i,1); }
+  for (let i=absRings.length-1;i>=0;i--) { const ar=absRings[i]; ar.r+=(ar.maxR-ar.r)*0.15; ar.life-=0.07; if(ar.life<=0) absRings.splice(i,1); }
+  for (let i=flashes.length-1;i>=0;i--) { flashes[i].life-=0.055; if(flashes[i].life<=0) flashes.splice(i,1); }
+  for (let i=lightnings.length-1;i>=0;i--) { lightnings[i].life-=0.12; if(lightnings[i].life<=0) lightnings.splice(i,1); }
+  for (let i=floatNums.length-1;i>=0;i--) { const fn=floatNums[i]; fn.y+=fn.vy; fn.vy*=0.97; fn.life-=0.018; if(fn.life<=0) floatNums.splice(i,1); }
+  for (const d of bgDots) {
+    d.x+=d.vx; d.y+=d.vy;
+    if(d.x<0) d.x=W; if(d.x>W) d.x=0; if(d.y<0) d.y=H; if(d.y>H) d.y=0;
+  }
+
+  // ── DOM ──
+  const t2 = cf / CYCLE;
+  const wallS2 = t2 < PH_WALL_S ? 0 : t2 < PH_WALL_P ? (t2-PH_WALL_S)/(PH_WALL_P-PH_WALL_S) : t2 < PH_WALL_E ? 1 : 0;
+  const inRocket = t2 > PH_WALL_E && t2 < PH_ROCK;
+
+  document.getElementById('rdSells').textContent  = totalSells;
+  document.getElementById('rdPrice').textContent  = curPV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('rdPriceSub').textContent = inRocket ? '↑ взлёт' : wallS2 > 0.05 ? '↓ падает' : 'уровень';
+  document.getElementById('rdWhale').textContent  = '+' + Math.round(totalBTC) + ' BTC';
+  document.getElementById('sBTC').textContent     = '+' + Math.round(totalBTC) + ' BTC';
+
+  document.getElementById('fPrice').textContent = curPV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const delta = curPV - P_BASE;
+  const fTag = document.getElementById('fTag');
+  if (inRocket) {
+    fTag.textContent='ROCKET ↑'; fTag.style.cssText='color:#32dc82;border:1px solid rgba(50,220,130,0.3);background:rgba(50,220,130,0.1);padding:4px 12px;border-radius:7px;font-size:11px;font-weight:800;letter-spacing:1.5px';
+    document.getElementById('fDelta').textContent='Δ +'+delta.toFixed(2)+' USD (+' + (delta/P_BASE*100).toFixed(3)+'%)';
+    document.getElementById('fDelta').style.color='#1a4030';
+  } else if (wallS2 > 0.1) {
+    fTag.textContent='SPOOF ACTIVE'; fTag.style.cssText='color:#ff5c5c;border:1px solid rgba(255,92,92,0.3);background:rgba(255,92,92,0.09);padding:4px 12px;border-radius:7px;font-size:11px;font-weight:800;letter-spacing:1.5px';
+    if (delta < -1) {
+      document.getElementById('fDelta').textContent='Δ '+delta.toFixed(2)+' USD ('+( delta/P_BASE*100).toFixed(3)+'%)';
+      document.getElementById('fDelta').style.color='rgba(255,92,92,0.35)';
+    }
+  } else {
+    fTag.textContent='MONITORING'; fTag.style.cssText='color:#32dc82;border:1px solid rgba(50,220,130,0.22);background:rgba(50,220,130,0.08);padding:4px 12px;border-radius:7px;font-size:11px;font-weight:800;letter-spacing:1.5px';
+    document.getElementById('fDelta').textContent='Δ 0.00 USD (0.000%)';
+    document.getElementById('fDelta').style.color='#1a2235';
+  }
+}
+
+// ══════════════════════════
+//  DRAW: Phantom Wall Zone
+// ══════════════════════════
+function drawWallZone() {
+  const cf = frameN % CYCLE, t = cf / CYCLE;
+  const wallS = t < PH_WALL_S ? 0 : t < PH_WALL_P ? (t-PH_WALL_S)/(PH_WALL_P-PH_WALL_S) : t < PH_WALL_E ? 1 : 0;
+  if (wallS < 0.02) return;
+
+  const pulse = 0.6 + 0.4 * Math.sin(frameN * 0.14);
+  const zoneH = WALL_BOT - WALL_TOP;
+
+  // Background fill
+  const bg = ctx.createLinearGradient(0, WALL_TOP, 0, WALL_BOT);
+  bg.addColorStop(0, `rgba(220,20,20,${wallS*0.08*pulse})`);
+  bg.addColorStop(0.5, `rgba(200,15,15,${wallS*0.14*pulse})`);
+  bg.addColorStop(1, `rgba(180,10,10,${wallS*0.06*pulse})`);
+  ctx.fillStyle = bg; ctx.fillRect(0, WALL_TOP, W, zoneH);
+
+  // Scanlines
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  for (let sy = WALL_TOP; sy < WALL_BOT; sy += 3) ctx.fillRect(0, sy, W, 1.2);
+
+  // Top/bottom edge glow
+  const eG = ctx.createLinearGradient(0, 0, W, 0);
+  eG.addColorStop(0,'rgba(255,60,60,0)'); eG.addColorStop(0.5,`rgba(255,60,60,${wallS*0.5*pulse})`); eG.addColorStop(1,'rgba(255,60,60,0)');
+  ctx.fillStyle = eG;
+  ctx.fillRect(0, WALL_TOP, W, 2.5);
+  ctx.fillRect(0, WALL_BOT - 2.5, W, 2.5);
+
+  // Left accent bar
+  ctx.fillStyle = `rgba(255,60,60,${wallS*0.8})`;
+  ctx.fillRect(0, WALL_TOP, 3, zoneH);
+  ctx.fillRect(W-3, WALL_TOP, 3, zoneH);
+
+  // Label
+  if (wallS > 0.35) {
+    const la = Math.min(1, (wallS - 0.35) / 0.3) * pulse;
+    ctx.font = `800 ${Math.round(14 + wallS * 5)}px Inter`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = `rgba(255,200,60,${la})`;
+    ctx.shadowColor = '#f5c842'; ctx.shadowBlur = 10 * wallS;
+    ctx.fillText('⚠  ФАНТОМНАЯ СТЕНА  ⚠', CX, WALL_CY - 8);
+    ctx.shadowBlur = 0;
+    ctx.font = '600 11px Inter';
+    ctx.fillStyle = `rgba(255,130,130,${la * 0.7})`;
+    ctx.fillText('8,540 BTC ПРОДАЖА • нажимает цену вниз', CX, WALL_CY + 14);
+  }
+
+  // Volume bar at bottom of zone
+  if (wallS > 0.2) {
+    const bw2 = (W - 40) * wallS;
+    const bg2 = ctx.createLinearGradient(20, 0, W-20, 0);
+    bg2.addColorStop(0,'rgba(255,60,60,0.06)'); bg2.addColorStop(1,'rgba(255,60,60,0.03)');
+    ctx.fillStyle = bg2; ctx.fillRect(20, WALL_BOT-14, W-40, 7);
+    const fg = ctx.createLinearGradient(20, 0, 20+bw2, 0);
+    fg.addColorStop(0,`rgba(255,60,60,${wallS*0.55})`); fg.addColorStop(1,`rgba(255,100,30,${wallS*0.35})`);
+    ctx.fillStyle = fg; ctx.shadowColor='#ff3030'; ctx.shadowBlur=8*wallS*pulse;
+    ctx.fillRect(20, WALL_BOT-14, bw2, 7);
+    ctx.shadowBlur=0;
+  }
+}
+
+// ══════════════════════════
+//  DRAW: Traders (falling red particles)
+// ══════════════════════════
+function drawTraders() {
+  for (const tr of traders) {
+    if (tr.state === 'absorbed') continue;
+    const pulse = 0.7 + 0.3 * Math.sin(frameN * 0.12 + tr.x * 0.04);
+    const col   = tr.state === 'pulled' ? '#ff8030' : '#ff5c5c';
+    const alpha = tr.state === 'pulled' ? 0.85 : 0.62 + pulse * 0.2;
+
+    // Trail for fast downward movers
+    if (tr.vy > 1.5 || tr.state === 'pulled') {
+      const tl = tr.state === 'pulled' ? 14 : 8;
+      for (let j = 1; j <= 4; j++) {
+        ctx.beginPath(); ctx.arc(tr.x - tr.vx*j*1.4, tr.y - tr.vy*j*1.4, tr.r * (1 - j*0.2), 0, Math.PI*2);
+        ctx.fillStyle = col; ctx.globalAlpha = alpha * (1 - j*0.22);
+        ctx.fill(); ctx.globalAlpha = 1;
+      }
+    }
+
+    ctx.beginPath(); ctx.arc(tr.x, tr.y, tr.r, 0, Math.PI*2);
+    ctx.fillStyle = col; ctx.globalAlpha = alpha;
+    ctx.shadowColor = col; ctx.shadowBlur = tr.state === 'pulled' ? 10 : 4;
+    ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+
+    // Panic cross on larger traders
+    if (tr.panic && tr.r > 3.5 && tr.state === 'falling') {
+      ctx.strokeStyle = `rgba(255,200,200,0.3)`; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(tr.x-tr.r-2, tr.y); ctx.lineTo(tr.x+tr.r+2, tr.y); ctx.stroke();
+    }
+  }
+}
+
+// ══════════════════════════
+//  DRAW: Price line
+// ══════════════════════════
+function drawPriceLine() {
+  const cf = frameN % CYCLE, t = cf / CYCLE;
+  const curPY  = getPY(frameN);
+  const curPV  = getPVal(frameN);
+  const wallS  = t < PH_WALL_S ? 0 : t < PH_WALL_P ? (t-PH_WALL_S)/(PH_WALL_P-PH_WALL_S) : t < PH_WALL_E ? 1 : 0;
+  const inRock = t > PH_WALL_E && t < PH_ROCK;
+  const col    = inRock ? '#32dc82' : wallS > 0.1 ? '#ff5c5c' : '#f5c842';
+  const pulse  = 0.7 + 0.3 * Math.sin(frameN * 0.1);
+
+  // Glow under price line
+  const lineGlow = ctx.createLinearGradient(0, curPY-12, 0, curPY+12);
+  lineGlow.addColorStop(0,'rgba(0,0,0,0)');
+  lineGlow.addColorStop(0.5,`rgba(${inRock?'50,220,130':wallS>0.1?'255,92,92':'245,200,66'},${0.08*pulse})`);
+  lineGlow.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=lineGlow; ctx.fillRect(0, curPY-12, W, 24);
+
+  // Main line
+  ctx.strokeStyle=col; ctx.lineWidth=2;
+  ctx.shadowColor=col; ctx.shadowBlur=12*pulse;
+  ctx.setLineDash(wallS > 0.1 && !inRock ? [10,6] : []);
+  ctx.beginPath(); ctx.moveTo(0, curPY); ctx.lineTo(W, curPY);
+  ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur=0;
+
+  // Right price label
+  ctx.font='700 13px Inter'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=8;
+  ctx.fillText(curPV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), W-10, curPY-13);
+  ctx.shadowBlur=0;
+
+  // Direction arrow
+  const arrow = inRock ? '▲' : wallS > 0.1 ? '▼' : '';
+  if (arrow) {
+    ctx.font='700 11px Inter';
+    ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=6;
+    ctx.fillText(arrow, W-10, curPY+13);
+    ctx.shadowBlur=0;
+  }
+}
+
+// ══════════════════════════
+//  DRAW: Predator
+// ══════════════════════════
+function drawPredator() {
+  const cf = frameN % CYCLE, t = cf / CYCLE;
+  const inRock  = t > PH_WALL_E && t < PH_ROCK;
+  const phase   = frameN * 0.035;
+  const pulse   = 0.6 + 0.4 * Math.sin(frameN * 0.11);
+  const absPulse= 1 + predPulse * 0.35;
+  const baseR   = 52 + predSize * 82;  // 52–134px
+  const s       = predSize;
+
+  if (s < 0.02 && !inRock) return;
+
+  const cx = PRED_CX, cy = PRED_CY;
+
+  // ── Far outer haze ──
+  const haze = ctx.createRadialGradient(cx,cy,baseR*0.5, cx,cy,baseR*2.4);
+  haze.addColorStop(0, inRock ? `rgba(20,100,40,${s*0.08*pulse})` : `rgba(100,5,5,${s*0.07*pulse})`);
+  haze.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle=haze; ctx.fillRect(0,0,W,H);
+
+  // ── Outer glow ring ──
+  const og = ctx.createRadialGradient(cx,cy,baseR*0.7, cx,cy,baseR*1.3);
+  og.addColorStop(0, inRock ? `rgba(30,180,80,${s*0.12})` : `rgba(180,10,10,${s*0.14})`);
+  og.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=og; ctx.globalAlpha=pulse; ctx.fill(); ctx.globalAlpha=1;
+
+  // ── Organic blob layers ──
+  const blobCol = inRock
+    ? `rgba(18,90,40,${0.7+s*0.3})`
+    : `rgba(80,4,4,${0.62+s*0.38})`;
+  drawBlob(cx, cy, baseR * absPulse, phase, blobCol, 1);
+  drawBlob(cx, cy, baseR * 0.72 * absPulse, phase * 1.3 + 1.2, inRock?'rgba(22,120,55,0.8)':'rgba(110,8,8,0.85)', 1);
+  drawBlob(cx, cy, baseR * 0.46 * absPulse, phase * 1.7 - 0.8, inRock?'rgba(30,160,70,0.9)':'rgba(155,12,12,0.9)', 1);
+
+  // ── Wisps / tentacles reaching upward ──
+  const nWisps = Math.floor(3 + s * 5);
+  const curPY  = getPY(frameN);
+  for (let i = 0; i < nWisps; i++) {
+    const baseAngle = -Math.PI * 0.5 + (i - nWisps * 0.5) * 0.38 + Math.sin(phase + i * 1.3) * 0.22;
+    const wlen      = baseR * (0.7 + s * 0.8 + Math.sin(phase * 1.2 + i) * 0.15);
+    const tx        = cx + Math.cos(baseAngle) * wlen;
+    const ty        = cy + Math.sin(baseAngle) * wlen;
+
+    // Find nearby trader to aim at
+    let aimX = tx, aimY = ty;
+    let minDist = 999;
+    for (const tr of traders) {
+      if (tr.state !== 'falling' && tr.state !== 'pulled') continue;
+      const d = Math.hypot(tr.x - cx, tr.y - cy);
+      if (d < minDist && tr.y > curPY) { minDist = d; aimX = tr.x; aimY = tr.y; }
+    }
+    if (minDist < 200) { aimX = cx + (aimX - cx) * 0.55; aimY = cy + (aimY - cy) * 0.55; }
+
+    const cp1x = cx + Math.cos(baseAngle + 0.25) * wlen * 0.35;
+    const cp1y = cy + Math.sin(baseAngle + 0.25) * wlen * 0.35;
+    const cp2x = cx + Math.cos(baseAngle - 0.18) * wlen * 0.72;
+    const cp2y = cy + Math.sin(baseAngle - 0.18) * wlen * 0.72;
+
+    const wAlpha = s * 0.35 * pulse;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, aimX, aimY);
+    ctx.strokeStyle = inRock ? `rgba(40,200,100,${wAlpha})` : `rgba(220,20,20,${wAlpha})`;
+    ctx.lineWidth = 1.5 * (1 - i / nWisps * 0.5);
+    ctx.stroke();
+  }
+
+  // ── Absorption rings ──
+  for (const ar of absRings) {
+    ctx.beginPath(); ctx.arc(cx, cy, ar.r, 0, Math.PI*2);
+    ctx.strokeStyle=inRock?'rgba(50,220,130,0.6)':'rgba(255,80,80,0.6)';
+    ctx.lineWidth=ar.life*2; ctx.globalAlpha=ar.life;
+    ctx.stroke(); ctx.globalAlpha=1;
+  }
+
+  // ── Core glow ──
+  const cg = ctx.createRadialGradient(cx,cy,0, cx,cy,baseR*0.28);
+  cg.addColorStop(0, inRock?'rgba(180,255,200,0.9)':'rgba(255,100,80,0.85)');
+  cg.addColorStop(0.5, inRock?'rgba(40,180,80,0.6)':'rgba(200,20,20,0.65)');
+  cg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=cg; ctx.globalAlpha=(0.5+s*0.5)*absPulse*pulse;
+  ctx.beginPath(); ctx.arc(cx, cy, baseR*0.28, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+
+  // ── Center point ──
+  ctx.beginPath(); ctx.arc(cx, cy, 4 + s*4, 0, Math.PI*2);
+  ctx.fillStyle=inRock?'#aaffcc':'#ffcccc';
+  ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=14*absPulse;
+  ctx.fill(); ctx.shadowBlur=0;
+
+  // ── BTC accumulation counter ──
+  if (s > 0.06) {
+    const btcLabel = '+' + Math.round(totalBTC) + ' BTC';
+    const labelY   = cy - baseR * absPulse - 18;
+    ctx.font = `800 ${Math.round(14 + s * 8)}px Inter`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = inRock ? '#32dc82' : '#ff8888';
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12 * pulse;
+    ctx.fillText(btcLabel, cx, labelY);
+    ctx.shadowBlur = 0;
+    if (s > 0.35) {
+      ctx.font = '600 10px Inter'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = inRock ? 'rgba(50,220,130,0.45)' : 'rgba(255,120,120,0.4)';
+      ctx.fillText('скупает пока все продают', cx, labelY + 12);
+    }
+  }
+}
+
+// ══════════════════════════
+//  DRAW: Price chart
+// ══════════════════════════
+function drawPriceChart() {
+  const cf = frameN % CYCLE, t = cf / CYCLE;
+  const inRock = t > PH_WALL_E && t < PH_ROCK;
+  const wallS  = t < PH_WALL_S ? 0 : t < PH_WALL_P ? (t-PH_WALL_S)/(PH_WALL_P-PH_WALL_S) : t < PH_WALL_E ? 1 : 0;
+
+  const P_MIN = 65148, P_MAX = 65368;
+  const pY = v => CHART_TOP + CHART_H - Math.max(0, Math.min(1, (v-P_MIN)/(P_MAX-P_MIN))) * CHART_H;
+
+  ctx.fillStyle='rgba(6,9,18,0.96)'; ctx.fillRect(CHART_X, CHART_TOP, CHART_W, CHART_H);
+  ctx.save(); ctx.beginPath(); ctx.rect(CHART_X, CHART_TOP, CHART_W, CHART_H); ctx.clip();
+
+  // Grid
+  for (let v=P_MIN;v<=P_MAX;v+=50) {
+    const y=pY(v);
+    ctx.beginPath(); ctx.moveTo(CHART_X,y); ctx.lineTo(CHART_X+CHART_W,y);
+    ctx.strokeStyle=v===P_BASE?'rgba(245,200,66,0.1)':'rgba(255,255,255,0.03)';
+    ctx.lineWidth=0.8;
+    if(v===P_BASE) ctx.setLineDash([6,8]);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.fillStyle='rgba(0,0,0,0.04)';
+  for(let sy=CHART_TOP;sy<CHART_TOP+CHART_H;sy+=3) ctx.fillRect(CHART_X,sy,CHART_W,1.2);
+
+  // Fill
+  ctx.beginPath();
+  for(let i=0;i<N_PTS;i++) { const y=pY(prcHist[i]); i===0?ctx.moveTo(CHART_X+i,y):ctx.lineTo(CHART_X+i,y); }
+  ctx.lineTo(CHART_X+N_PTS-1, CHART_TOP+CHART_H); ctx.lineTo(CHART_X, CHART_TOP+CHART_H); ctx.closePath();
+  const fill=ctx.createLinearGradient(0,CHART_TOP,0,CHART_TOP+CHART_H);
+  if(inRock) { fill.addColorStop(0,'rgba(50,220,130,0.15)'); fill.addColorStop(1,'rgba(50,220,130,0.01)'); }
+  else if(wallS>0.1) { fill.addColorStop(0,'rgba(255,92,92,0.1)'); fill.addColorStop(1,'rgba(255,92,92,0.01)'); }
+  else { fill.addColorStop(0,'rgba(238,240,248,0.05)'); fill.addColorStop(1,'rgba(0,0,0,0)'); }
+  ctx.fillStyle=fill; ctx.fill();
+
+  // Line
+  const lCol=inRock?'#32dc82':wallS>0.1?'#ff5c5c':'rgba(238,240,248,0.65)';
+  ctx.beginPath();
+  for(let i=0;i<N_PTS;i++) { const y=pY(prcHist[i]); i===0?ctx.moveTo(CHART_X+i,y):ctx.lineTo(CHART_X+i,y); }
+  ctx.strokeStyle=lCol; ctx.lineWidth=inRock?2.5:1.9;
+  ctx.shadowColor=lCol; ctx.shadowBlur=inRock?18:wallS>0.1?7:3;
+  ctx.stroke(); ctx.shadowBlur=0;
+  ctx.restore();
+
+  ctx.strokeStyle=inRock?'rgba(50,220,130,0.2)':wallS>0.1?'rgba(255,92,92,0.14)':'rgba(255,255,255,0.06)';
+  ctx.lineWidth=1; ctx.strokeRect(CHART_X, CHART_TOP, CHART_W, CHART_H);
+
+  ctx.font='700 9px Inter'; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillStyle=inRock?'rgba(50,220,130,0.35)':wallS>0.1?'rgba(255,92,92,0.3)':'rgba(238,240,248,0.18)';
+  ctx.fillText('ЦЕНА  BTC/USDT', CHART_X+8, CHART_TOP+5);
+
+  // Live dot
+  const lv=prcHist[N_PTS-1], lvY=pY(lv);
+  ctx.beginPath(); ctx.arc(CHART_X+CHART_W-1, lvY, 5, 0, Math.PI*2);
+  ctx.fillStyle=lCol; ctx.shadowColor=lCol; ctx.shadowBlur=10; ctx.fill(); ctx.shadowBlur=0;
+  ctx.beginPath(); ctx.arc(CHART_X+CHART_W-1, lvY, 2, 0, Math.PI*2);
+  ctx.fillStyle='#fff'; ctx.fill();
+}
+
+// ══════════════════════════
+//  DRAW MAIN
+// ══════════════════════════
+function draw() {
+  const sx = shakeAmt > 0 ? rnd(-shakeAmt, shakeAmt) : 0;
+  const sy = shakeAmt > 0 ? rnd(-shakeAmt, shakeAmt) : 0;
+  ctx.save(); ctx.translate(sx, sy);
+
+  ctx.fillStyle='#08090f'; ctx.fillRect(-30,-30,W+60,H+60);
+
+  for (const d of bgDots) {
+    ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2);
+    ctx.fillStyle=d.col; ctx.globalAlpha=d.a; ctx.fill(); ctx.globalAlpha=1;
+  }
+
+  drawWallZone();
+  drawTraders();
+  drawPriceLine();
+  drawPredator();
+  drawPriceChart();
+
+  // Rings
+  for (const rg of rings) {
+    ctx.beginPath(); ctx.arc(rg.x, rg.y, rg.r, 0, Math.PI*2);
+    ctx.strokeStyle=rg.col; ctx.lineWidth=rg.life*(rg.thick?4.5:2);
+    ctx.globalAlpha=rg.life*0.68; ctx.shadowColor=rg.col; ctx.shadowBlur=12;
+    ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  // Lightnings
+  for (const l of lightnings) drawLightning(l.x1, l.y1, l.x2, l.y2, l.col, l.life*0.84, l.thick?2.1:1.4);
+
+  // Particles
+  for (const p of parts) {
+    ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.3, p.r*p.life), 0, Math.PI*2);
+    ctx.fillStyle=p.col; ctx.globalAlpha=p.life; ctx.shadowColor=p.col; ctx.shadowBlur=5;
+    ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  // Sparks
+  for (const s of sparks) {
+    const ex=s.x-s.vx*s.len*(0.4+s.life*0.6), ey=s.y-s.vy*s.len*(0.4+s.life*0.6);
+    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(ex,ey);
+    ctx.strokeStyle=s.col; ctx.lineWidth=s.life*2.1; ctx.globalAlpha=s.life*0.8;
+    ctx.shadowColor=s.col; ctx.shadowBlur=5; ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  // Flashes
+  for (const f of flashes) {
+    const prog=1-f.life;
+    ctx.beginPath(); ctx.arc(f.x,f.y,4+prog*72,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,80,80,${f.life*0.36})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(f.x,f.y,2+prog*22,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,210,200,${f.life*0.85})`; ctx.fill();
+  }
+
+  // Float numbers
+  for (const fn of floatNums) {
+    ctx.font=fn.big?`900 ${Math.round(16+fn.life*7)}px Inter`:'800 13px Inter';
+    ctx.fillStyle=fn.col; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.globalAlpha=fn.life; ctx.shadowColor=fn.col; ctx.shadowBlur=fn.big?20:8;
+    ctx.fillText(fn.text, fn.x, fn.y); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  ctx.restore();
+
+  // Screen flash
+  if (screenFlash > 0) {
+    if (screenFlash > 0.8) { ctx.fillStyle=`rgba(255,255,255,${(screenFlash-0.8)*0.44})`; ctx.fillRect(0,0,W,H); }
+    ctx.fillStyle=`rgba(50,220,130,${Math.min(1,screenFlash)*0.18})`; ctx.fillRect(0,0,W,H);
+  }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+</script>
+</body>
+</html>
